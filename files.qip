@@ -3,3 +3,16 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cos.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mycore.v
 set_global_assignment -name SDC_FILE mycore.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE mycore.sv
+
+set_global_assignment -name VERILOG_FILE rtl/KB_8042.v
+set_global_assignment -name VERILOG_FILE rtl/PIC_8259.v
+set_global_assignment -name VERILOG_FILE rtl/timer8253.v
+set_global_assignment -name VERILOG_FILE rtl/vga.v
+set_global_assignment -name VERILOG_FILE rtl/unit186.v
+
+set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_ALU.v
+set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_BIU_2T_delayread.v
+set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_CPU.v
+set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_Regs.v
+
+set_global_assignment -name VHDL_FILE rtl/ipcore/cache.vhd
