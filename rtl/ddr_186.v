@@ -4,9 +4,9 @@
 // http://opencores.org/project,next186
 //
 // Filename: ddr_186.v
-// Description: Part of the Next186 SoC PC project, main system, ddr interface
-// Version 1.0
-// Creation date: Apr2012
+// Description: Part of the Next186 SoC PC project, main system, RAM interface
+// Version 2.0
+// Creation date: Apr2014
 //
 // Author: Nicolae Dumitrache 
 // e-mail: ndumitrache@opencores.org
@@ -37,729 +37,730 @@
 // from http://www.opencores.org/lgpl.shtml 
 // 
 ///////////////////////////////////////////////////////////////////////////////////
-// Additional Comments: 
-//
-// 25Apr2012 - added SD card SPI support
-// 15May2012 - added PIT 8253 (sound + timer INT8)
-// 24May2012 - added PIC 8259  
-// 28May2012 - RS232 boot loader does not depend on CPU speed anymore (uses timer0)
-//	01Feb2013 - ADD 8042 PS2 Keyboard & Mouse controller
-// 27Feb2013 - ADD RTC
-// 04Apr2013 - ADD NMI, port 3bc for 8 leds
-//
-//Route:455 - CLK Net:u_ddr/top_00/dqs_int_delay_in<0> may have excessive skew because 
-//   22 CLK pins and 0 NON_CLK pins failed to route using a CLK template.
-//////////////////////////////////////////////////////////////////////////////////
- 
+
 /* ----------------- implemented ports -------------------
-0001 - write RS232 (bit0)
- 
-0021, 00a1 - interrupt controller data ports. R/W interrupt mask, 1disabled/0enabled (bit0=timer, bit1=keyboard, bit3=RTC, bit4=mouse) 
- 
+
+0001 - BYTE write: bit01=ComSel (00=DCE, 01=EXT, 1x=HOST), bit2=Host reset, bit43=COM divider shift right bits
+0001 - WORD write: bit0=auto cache flush
+	  
+0002 - 32 bit CPU data port R/W, lo first
+0003 - 32 bit CPU command port W
+		16'b00000cvvvvvvvvvv = set r/w pointer - 256 32bit integers, 1024 instructions. c=1 for code write, 0 for data read/write
+		16'b100wwwvvvvvvvvvv = run ip - 1024 instructions, 3 bit data window offs
+
+0021 - interrupt controller master data port. R/W interrupt mask, 1disabled/0enabled (bit0=timer, bit1=keyboard, bit4=COM1) 
+00a1 - interrupt controller slave data port. R/W interrupt mask, 1disabled/0enabled (bit0=RTC, bit4=mouse) 
+
 0040-0043 - PIT 8253 ports
- 
+
 0x60, 0x64 - 8042 keyboard/mouse data and cfg
- 
-0061 - bits1:0 speaker on/off (write only)
- 
-0070 - RTC (16bit write only counter value). RTC is incremented with 1Mhz and at set value sends INT70h, then restart from 0
-		 When set, it restarts from 0. If the set value is 0, it will send INT70h only once, if it was not already 0
- 
+
 080h-08fh - memory map: bit9:0=64 Kbytes DDRAM segment index (up to 1024 segs = 64MB), mapped over 
 								PORT[3:0] 80186 addressable segment
- 
-03BC - parallel port (out only) LED[7:0]
- 
-03C0 - VGA mode (index 10h only)
+								
+0378 - sound port: 8bit=Covox & DSS compatible, 16bit = stereo L+R - fifo sampled at 44100Hz
+		 bit4 of port 03DA is 1 when the sound queue is full. If it is 0, the queue may accept up to 1152 stereo samples (L + R), so 2304 16bit writes.
+
+0379 - parallel port control: bit6 = 1 when DSS queue is full
+
+0388,0389,038A,038B - Adlib ports: 0388=bank1 addr, 0389=bank1 data, 038A=bank2 addr, 038B=bank2 data
+
+03C0 - VGA mode 
+		index 00h..0Fh  = EGA palette registers
+		index 10h:
 			bit0 = graphic(1)/text(0)
 			bit3 = text mode flash enabled(1)
-			bit6 = 320x200(1)/640x480(0)
- 
+			bit4 = half mode (EGA)
+			bit5 = ppm - pixel panning mode
+			bit6 = vga mode 13h(1)
+			bit7 = P54S - 1 to use color select 5-4 from reg 14h
+		index 13h: bit[3:0] = hrz pan
+		index 14h: bit[3:2] = color select 7-6, bit[1:0] = color select 5-4
+
+03C4, 03C5 (Sequencer registers) - idx2[3:0] = write plane, idx4[3]=0 for planar (rw)
+
 03C6 - DAC mask (rw)
 03C7 - DAC read index (rw)
 03C8 - DAC write index (rw)
 03C9 - DAC color (rw)
 03CB - font: write WORD = set index (8 bit), r/w BYTE = r/w font data
- 
-03DA - read VGA status, bit0=1 on vblank or hblank, bit1=RS232in, bit3=1 on vblank, bit7=1 always, bit15:8=SD SPI byte read
+
+03CE, 03CF (Graphics registers) (rw)
+	0: setres <= din[3:0];
+	1: enable_setres <= din[3:0];
+	2: color_compare <= din[3:0];
+	3: logop <= din[4:3];
+	4: rplane <= din[1:0];
+	5: rwmode <= {din[3], din[1:0]};
+	7: color_dont_care <= din[3:0];
+	8: bitmask <= din[7:0]; (1=CPU, 0=latch)
+
+03DA - read VGA status, bit0=1 on vblank or hblank, bit1=RS232in, bit2=i2cackerr, bit3=1 on vblank, bit4=sound queue full, bit5=DSP32 halt, bit6=i2cack, bit7=1 always, bit15:8=SD SPI byte read
 		 write bit7=SD SPI MOSI bit, SPI CLK 0->1 (BYTE write only), bit8 = SD card chip select (WORD write only)
 		 also reset the 3C0 port index flag
- 
+
 03B4, 03D4 - VGA CRT write index:  
-										0A(bit 5 only): hide cursor
-										0C: HI screen offset
-										0D: LO screen offset
-										0E: HI cursor pos
-										0F: LO cursor pos
+										07h: bit1 = VDE8, bit4 = LCR8, bit6 = VDE9
+										09h: bit6 = LCR9
+										0Ah(bit 5 only): hide cursor
+										0Ch: HI screen offset
+										0Dh: LO screen offset
+										0Eh: HI cursor pos
+										0Fh: LO cursor pos
+										12h: VDE[7:0]
+										13h: scan line offset
+										18h: Line Compare Register (LCR)
+
 03B5, 03D5 - VGA CRT read/write data
+
 */
- 
- 
+
 `timescale 1ns / 1ps
- 
-module system
-	(
-		 inout	[15:0]cntrl0_ddr2_dq,        
-		 output	[12:0]cntrl0_ddr2_a,         
-		 output	[1:0]	cntrl0_ddr2_ba,        
-		 output			cntrl0_ddr2_cke,       
-		 output			cntrl0_ddr2_cs_n,      
-		 output			cntrl0_ddr2_ras_n,     
-		 output			cntrl0_ddr2_cas_n,     
-		 output			cntrl0_ddr2_we_n,      
-		 output			cntrl0_ddr2_odt,       
-		 output	[1:0]	cntrl0_ddr2_dm,        
-		 inout	[1:0]	cntrl0_ddr2_dqs,       
-		 inout	[1:0]	cntrl0_ddr2_dqs_n,     
-		 output			cntrl0_ddr2_ck,        
-		 output			cntrl0_ddr2_ck_n,
-		 input			cntrl0_rst_dqs_div_in, 
-		 output			cntrl0_rst_dqs_div_out,
- 
-		 input			sys_clk_in,     // 133Mhz
-		 input 			CLK_50MHZ,
- 
-		 output wire[3:0]	VGA_R,
-		 output wire[3:0]	VGA_G,
-		 output wire[3:0]	VGA_B,
-		 output wire VGA_HSYNC,
-		 output wire VGA_VSYNC,
- 
-		 input BTN_SOUTH,		// Reset
-		 input BTN_WEST,		// NMI
-//		 output reg [7:0]LED,
-		 output FPGA_AWAKE,	// HALT
-		 input RS232_DCE_RXD,
-		 output reg RS232_DCE_TXD,
- 
-		 output reg SD_CS = 1,
-		 output wire SD_DI,
-		 output reg SD_CK = 0,
-		 input SD_DO,
- 
-		 output AUD_L,
-		 output AUD_R,
-	 	 inout PS2_CLK1,
-		 inout PS2_CLK2,
-		 inout PS2_DATA1,
-		 inout PS2_DATA2
-    );
- 
-	wire [31:0]cntrl0_user_output_data;//o    
-	wire [31:0]cntrl0_user_input_data;//i    
-	wire [11:0]waddr;
+
+module system (
+	input  clk_25, // VGA
+	input  clk_sdr, // SDRAM
+	input  CLK44100x256, // Soundwave
+	input  CLK14745600, // RS232 clk
+	input  clk_50, // OPL3
+	input  clk_OPL,
+
+	input  clk_cpu,
+	input  clk_dsp,
+	input  [1:0] cpu_speed, // CPU speed control, 0 - maximum
+
+	output [3:0]sdr_n_CS_WE_RAS_CAS,
+	output [1:0]sdr_BA,
+	output [12:0]sdr_ADDR,
+	inout [15:0]sdr_DATA,
+	output [1:0]sdr_DQM,
+
+	output reg [5:0]VGA_R,
+	output reg [5:0]VGA_G,
+	output reg [5:0]VGA_B,
+	output frame_on,
+	output wire VGA_HSYNC,
+	output wire VGA_VSYNC,
+
+	output wire hblnk,
+	output wire vblnk,
+
+	input BTN_RESET,	// Reset
+	input BTN_NMI,		// NMI
+	output [7:0]LED,	// HALT
+	input RS232_DCE_RXD,
+	output RS232_DCE_TXD,
+	input RS232_EXT_RXD,
+	output RS232_EXT_TXD,
+	input RS232_HOST_RXD,
+	output RS232_HOST_TXD,
+	output reg RS232_HOST_RST,
+
+	output reg SD_n_CS = 1'b1,
+	output wire SD_DI,
+	output reg SD_CK = 0,
+	input SD_DO,
+		 
+	output AUD_L,
+	output AUD_R,
+	input PS2_CLK1_I,
+	output PS2_CLK1_O,
+	input PS2_CLK2_I,
+	output PS2_CLK2_O,
+	input PS2_DATA1_I,
+	output PS2_DATA1_O,
+	input PS2_DATA2_I,
+	output PS2_DATA2_O,
+	 
+	inout [7:0]GPIO,
+	output I2C_SCL,
+	inout I2C_SDA,
+
+	input [12:0] BIOS_ADDR,
+	input [15:0] BIOS_DIN,
+	input BIOS_WR,
+	output BIOS_REQ
+);
+
+	localparam BIOS_BASE = 20'h57800;
+	initial SD_n_CS = 1'b1;
+
+	wire [15:0]cntrl0_user_input_data;
+	wire [1:0]sys_cmd_ack;
+	wire sys_rd_data_valid;
+	wire sys_wr_data_valid;   
+	wire [15:0]sys_DOUT;	// sdr data out
 	wire [31:0] DOUT;
 	wire [15:0]CPU_DOUT;
 	wire [15:0]PORT_ADDR;
 	wire [31:0] DRAM_dout;
-	wire [31:0] SRAM_dout;
-	wire [19:0] ADDR;
+	wire [20:0] ADDR;
 	wire IORQ;
 	wire WR;
 	wire INTA;
 	wire WORD;
 	wire [3:0] RAM_WMASK;
-	wire cntrl0_ar_done;
-	wire cntrl0_auto_ref_req;
-	wire cntrl0_user_cmd_ack;
-	wire cntrl0_user_data_valid;
-	wire cntrl0_sys_rst180_tb;
-	wire cntrl0_init_done;
-	wire hblnk;
-	wire vblnk;
+	//wire hblnk;
+	//wire vblnk;
 	wire [9:0]hcount;
 	wire [9:0]vcount;
-	wire displ_on = !(hblnk | vblnk);
-	wire [15:0]fifo_dout;
-	wire [11:0]DAC_COLOR;
-	wire fifo_empty;	// fifo empty
-	wire full;
-	wire prog_full;
-	wire prog_empty;
-	wire clk_25;
-	wire clk_cpu;
-	wire CPU_CE;	// CPU clock enable
+	reg [3:0]vga_hrzpan = 0;
+	wire [3:0]vga_hrzpan_req;
+	wire [9:0]hcount_pan = hcount + vga_hrzpan - 17;
+	reg FifoStart = 1'b0; // fifo not empty
+	wire displ_on = !(hblnk | vblnk | !FifoStart);	
+	wire [17:0]DAC_COLOR;
+	wire [8:0]fifo_wr_used_words;
+	wire AlmostFull;
+	wire AlmostEmpty;
+	wire CPU_CE; // CPU clock enable
 	wire CE;
+	wire CE_186;
 	wire ddr_rd; 
 	wire ddr_wr;
-	wire TIMER_OE;
-	wire VGA_DAC_OE;
-	wire LED_PORT = PORT_ADDR[15:0] == 16'h03bc;
-	wire SPEAKER_PORT = PORT_ADDR[15:0] == 16'h0061;
+	wire TIMER_OE = PORT_ADDR[15:2] == 14'b00000000010000;	//   40h..43h
+	wire VGA_DAC_OE = PORT_ADDR[15:4] == 12'h03c && PORT_ADDR[3:0] <= 4'h9; // 3c0h..3c9h	
 	wire MEMORY_MAP = PORT_ADDR[15:4] == 12'h008;
 	wire VGA_FONT_OE = PORT_ADDR[15:0] == 16'h03cb;
-	wire RS232_OE = PORT_ADDR[15:0] == 16'h0001;
+	wire AUX_OE = PORT_ADDR[15:0] == 16'h0001;
 	wire INPUT_STATUS_OE = PORT_ADDR[15:0] == 16'h03da;
-	wire VGA_CRT_OE = (PORT_ADDR[15:1] == 15'b000000111011010) || (PORT_ADDR[15:1] == 15'b000000111101010); // 3b4, 3b5, 3d4, 3d5
-	wire RTC_SELECT = PORT_ADDR[15:0] == 16'h0070;
-	wire [7:0]VGA_DAC_DATA;
+	wire VGA_CRT_OE = (PORT_ADDR[15:1] == 15'b000000111011010) || (PORT_ADDR[15:1] == 15'b000000111101010); // 3b4h, 3b5h, 3d4h, 3d5h
+	wire VGA_SC = PORT_ADDR[15:1] == (16'h03c4 >> 1); // 3c4h, 3c5h
+	wire VGA_GC = PORT_ADDR[15:1] == (16'h03ce >> 1); // 3ceh, 3cfh
+	wire PIC_OE = PORT_ADDR[15:8] == 8'h00 && PORT_ADDR[6:0] == 7'b0100001;	// 21h, a1h
+	wire KB_OE = PORT_ADDR[15:4] == 12'h006 && {PORT_ADDR[3], PORT_ADDR[1:0]} == 3'b000; // 60h, 64h
+	wire PARALLEL_PORT = PORT_ADDR[15:0] == 16'h0378;
+	wire PARALLEL_PORT_CTL = PORT_ADDR[15:0] == 16'h0379;
+	wire CPU32_PORT = PORT_ADDR[15:1] == (16'h0002 >> 1); // port 1 for data and 3 for instructions
+	wire OPL3_PORT = PORT_ADDR[15:2] == (16'h0388 >> 2); // 0x388 .. 0x38b
+ 	wire [7:0]VGA_DAC_DATA;
 	wire [7:0]VGA_CRT_DATA;
+	wire [7:0]VGA_SC_DATA;
+	wire [7:0]VGA_GC_DATA;
 	wire [15:0]PORT_IN;
 	wire [7:0]TIMER_DOUT;
 	wire [7:0]KB_DOUT;
 	wire [7:0]PIC_DOUT;
-	wire PIC_OE; 
-	wire KB_OE;
- 
-	reg [3:0]STATE = 0;
+	wire HALT;
+	wire sq_full; // sound queue full
+	wire dss_full;
+	wire [15:0]cpu32_data;
+	wire cpu32_halt;
 	reg [1:0]cntrl0_user_command_register = 0;
-	reg cntrl0_burst_done = 0;
-	reg [15:0]vga_ddr_row_col = 0;// = 16'h4000; // video buffer at 0xa0000
-	reg [4:0]cache_counter = 0;
-	reg [5:0]lowaddr = 0; //cache mem address
+	reg [16:0]vga_ddr_row_col = 0; // video buffer offset (multiple of 4)
 	reg s_prog_full;
 	reg s_prog_empty;
-	reg s_ddr_rd;
-	reg s_ddr_wr;
-	reg cache_op = 0;
-	reg [1:0]cww = 0; // cache write window
-	reg [3:0]crw = 0;	// cache read window
-	reg crw_start = 0;
-	reg rfsh = 0;
-	wire ccd = cache_counter == 5'b11111;
-	reg s_RS232_DCE_RXD;
-	reg [4:0]rstcount = 0;
-	reg [1:0]s_displ_on = 0;	// clk_25 delayed displ_on
-	reg [2:0]vga400 = 0; 	// 1 for 400 lines, 0 for 480 lines
-	reg [2:0]vgatext = 0;  // 1 for text mode
+	reg s_ddr_rd = 1'b0;
+	reg s_ddr_wr = 1'b0;
+	reg crw = 0; // 1=cache read window
+	reg [18:0]rstcount = 0;
+	reg [18:0]s_displ_on = 0; // clk_25 delayed displ_on
+	reg [2:0]vga13 = 0;       // 1 for mode 13h
+	reg [2:0]vgatext = 0;     // 1 for text mode
+	reg [2:0]v240 = 0;
+	reg [2:0]planar = 0;
+	reg [2:0]half = 0;
+	reg [0:0]repln_graph = 0;
 	wire vgaflash;
 	reg flashbit = 0;
 	reg [5:0]flashcount = 0;
-	reg s_ddr_endburst = 0;
-	wire [11:0]charcount = {vcount[8:4], 4'b0000} + {vcount[8:4], 6'b000000} + hcount[9:3];
- 
-	reg [8:0]vga_ddr_row_count = 0; 
+	wire [5:0]char_row = vcount[8:3] >> !half[2];
+	wire [3:0]char_ln = {(vcount[3] & !half[1]), vcount[2:0]};
+	wire [11:0]charcount = {char_row, 4'b0000} + {char_row, 6'b000000} + hcount_pan[9:3];
+	wire [31:0]fifo_dout32;
+	wire [15:0]fifo_dout = (vgatext[1] ? hcount_pan[3] : vga13[1] ? hcount_pan[2] : hcount_pan[1]) ? fifo_dout32[31:16] : fifo_dout32[15:0];
+	reg [8:0]vga_ddr_row_count = 0;
+	reg [2:0]max_read;
+	reg [4:0]col_counter;
+	wire vga_end_frame = vga_ddr_row_count == (v240[0] ? 479 : 399);
 	reg [3:0]vga_repln_count = 0; // repeat line counter
-	reg [6:0]vga_lnbytecount = 0; // line byte count (multiple of 8)
+	wire [3:0]vga_repln = vgatext[0] ? (half[0] ? 7 : 15) : {3'b000, repln_graph[0]}; //(vga13[0] | half[0]) ? 1 : 0;
+	reg [7:0]vga_lnbytecount = 0; // line byte count (multiple of 4)
+	wire [4:0]vga_lnend = (vgatext[0] | half[0]) ? 6 : (vga13[0] | planar[0]) ? 11 : 21; // multiple of 32 (SDRAM resolution = 32)
 	reg [11:0]vga_font_counter = 0;
 	reg [7:0]vga_attr;
-	reg [4:0]RTCDIV25 = 0;
-	reg [1:0]RTCSYNC = 0;
-	reg [15:0]RTC = 0;
-	reg [15:0]RTCSET = 0;
-	wire RTCEND = RTC == RTCSET;
-	wire RTCDIVEND = RTCDIV25 == 24;
-	wire [11:0]cache_hi_addr = |cww ? waddr : ADDR[19:8];
-	wire [9:0]memmap;
-	wire [9:0]memmap_mux;
-	wire [3:0]vga_repln = vgatext[0] ? 15 : vga400[0] ? 1 : 0;
-	wire [6:0]vga_lnend = vgatext[0] ? 19 : vga400[0] ? 39 : 79; // multiple of 8(DDRAM resolution = 8)
-	wire vga_end_line = vga_lnbytecount == vga_lnend;
-	wire vga_repeat_line = vga_repln_count != vga_repln;
-	wire vga_end_frame = vga_ddr_row_count == (vgatext[0] | vga400[0] ? 399 : 479);
+	wire [14:0]cache_hi_addr;
+	wire [8:0]memmap;
+	wire [8:0]memmap_mux;
 	wire [7:0]font_dout;
 	wire [7:0]VGA_FONT_DATA;
-	wire [2:0]pxindex = -hcount[2:0];
 	wire vgatextreq;
-	wire vga400req;
+	wire vga13req;
+	wire planarreq;
+	wire replnreq;
+	wire halfreq;
 	wire oncursor;
+	wire [4:0]crs[1:0];
 	wire [11:0]cursorpos;
 	wire [15:0]scraddr;
 	reg flash_on;
-	reg speaker_on = 0;
-	reg [9:0]rNMI = 0;
-	wire [3:0]VGA_MUX = (font_dout[pxindex] ^ flash_on) ? vga_attr[3:0] : {vga_attr[7] & ~vgaflash, vga_attr[6:4]};
- 
-	wire [3:0]sdon = {4{s_displ_on[vgatext[1]]}};
-	assign VGA_R[3:0] = DAC_COLOR[3:0] & sdon;
-	assign VGA_G[3:0] = DAC_COLOR[7:4] & sdon;
-	assign VGA_B[3:0] = DAC_COLOR[11:8] & sdon;
- 
+	wire [2:0]shift = half[1] ? ~hcount_pan[3:1] : ~hcount_pan[2:0];
+	wire [2:0]pxindex = -hcount_pan[2:0];
+	wire [3:0]EGA_MUX = vgatext[1] ? (font_dout[pxindex] ^ flash_on) ? vga_attr[3:0] : {vga_attr[7] & ~vgaflash, vga_attr[6:4]} : {fifo_dout32[{2'b11, shift}], fifo_dout32[{2'b10, shift}], fifo_dout32[{2'b01, shift}], fifo_dout32[{2'b00, shift}]};
+	wire [7:0]VGA_INDEX;						  
+	reg [3:0]exline = 4'b0000; // extra 8 dwords (32 bytes) for screen panning
+	wire vrdon = s_displ_on[~vga_hrzpan];
+	wire vrden = (vrdon || exline[3]) && ((vgatext[1] | half[1]) ? &hcount_pan[3:0] : (vga13[1] | planar[1]) ? &hcount_pan[2:0] : &hcount_pan[1:0]);
+	reg s_vga_endline;
+	reg s_vga_endscanline = 1'b0;
+	reg s_vga_endframe;
+	reg [23:0]sdraddr;
+	wire [3:0]vga_wplane;
+	wire [1:0]vga_rplane;
+	wire [7:0]vga_bitmask; // write 1=CPU, 0=VGA latch
+	wire [2:0]vga_rwmode;
+	wire [3:0]vga_setres;
+	wire [3:0]vga_enable_setres;
+	wire [1:0]vga_logop;
+	wire [3:0]vga_color_compare;
+	wire [3:0]vga_color_dont_care;
+	wire [2:0]vga_rotate_count;
+	wire [7:0]vga_offset;
+	wire ppm; 			// pixel panning mode
+	wire [9:0]lcr; 	// line compare register
+	wire [9:0]vde;		// vertical display end
+	wire sdon = s_displ_on[17+vgatext[1]] & (vcount <= vde);
+
 // SD interface
 	reg [7:0]SDI;
 	assign SD_DI = CPU_DOUT[7];
- 
-	assign PORT_IN[15:8] = { ({8{MEMORY_MAP}} & {6'b000000, memmap[9:8]}) |
-									 ({8{INPUT_STATUS_OE}} & SDI)
-								  };
- 
-	assign PORT_IN[7:0] = {  ({8{VGA_DAC_OE}} & VGA_DAC_DATA) |
-									 ({8{VGA_FONT_OE}}& VGA_FONT_DATA) |
-									 ({8{KB_OE}} & KB_DOUT) |
-									 ({8{INPUT_STATUS_OE}} & {4'b1xxx, vblnk, 1'bx, s_RS232_DCE_RXD, hblnk | vblnk}) | 
-									 ({8{VGA_CRT_OE}} & VGA_CRT_DATA) | 
-									 ({8{MEMORY_MAP}} & {memmap[7:0]}) |
-									 ({8{TIMER_OE}} & TIMER_DOUT) |
-									 ({8{PIC_OE}} & PIC_DOUT)
-								 };
- 
-	dcm_vga dcm133_25 
+	
+// opl3 interface
+   wire [7:0]opl32_data;
+   wire [15:0]opl3left;
+   wire [15:0]opl3right;
+   wire stb44100;
+	assign frame_on = s_displ_on[16+vgatext[1]];
+
+	assign PORT_IN[15:8] = 
+		({8{MEMORY_MAP}} & {7'b0000000, memmap[8]}) |
+		({8{INPUT_STATUS_OE}} & SDI) |
+		({8{CPU32_PORT}} & cpu32_data[15:8]);
+	
+   assign PORT_IN[7:0] =
+							 ({8{VGA_DAC_OE}} & VGA_DAC_DATA) |
+							 ({8{VGA_FONT_OE}}& VGA_FONT_DATA) |
+							 ({8{KB_OE}} & KB_DOUT) |
+							 ({8{INPUT_STATUS_OE}} & {1'b1, 1'b0, cpu32_halt, sq_full, vblnk, 1'b0, 1'b0, vblnk|hblnk}) | 
+							 ({8{VGA_CRT_OE}} & VGA_CRT_DATA) | 
+							 ({8{MEMORY_MAP}} & {memmap[7:0]}) |
+							 ({8{TIMER_OE}} & TIMER_DOUT) |
+							 ({8{PIC_OE}} & PIC_DOUT) |
+							 ({8{VGA_SC}} & VGA_SC_DATA) |
+							 ({8{VGA_GC}} & VGA_GC_DATA) |
+							 ({8{PARALLEL_PORT_CTL}} & {1'bx, dss_full, 6'bxxxxxx}) |
+							 ({8{CPU32_PORT}} & cpu32_data[7:0]) | 
+							 ({8{OPL3_PORT}} & opl32_data) ;
+
+	assign BIOS_REQ = sys_wr_data_valid;
+	reg [15:0] BIOS_data;
+	reg        BIOS_data_valid;
+	reg  [1:0] auto_flush = 2'b00; // decod81
+
+	SDRAM_16bit SDR
 	(
-    .CLKIN_IN(sys_clk_in), 
-    .CLKFX_OUT(clk_25), 
-    .CLKIN_IBUFG_OUT(CLKIN_IBUFG_OUT), 
-    .CLK0_OUT(CLK0_OUT), 
-    .CLK90_OUT(CLK90_OUT), 
-    .LOCKED_OUT(LOCKED_OUT)
-//	 .CLKDV_OUT(clk_cpu)
-    );
- 
-	 dcm_cpu dcm50_cpu 
-	 (
-	  .CLKIN_IN(CLK_50MHZ), 
-     .CLKFX_OUT(clk_cpu)
-//	  .CLKDV_OUT(clk_25)
- //   .CLKIN_IBUFG_OUT(CLKIN_IBUFG_OUT), 
- //   .CLK0_OUT(CLK0_OUT)
-    );
- 
-// ddr_cal_ctl.v, line 194, I made <tapfordqs> always fixed <default_tap> instead of variable <tapfordqs1> 
-// ddr_s3_dqs_iob.v, line 115, added delay property .IBUF_DELAY_VALUE("4") to IBUFDS (works ok for values < 8)
-	ddr u_ddr 
-	( 
-      .cntrl0_ddr2_dq            (cntrl0_ddr2_dq),
-      .cntrl0_ddr2_a             (cntrl0_ddr2_a),
-      .cntrl0_ddr2_ba            (cntrl0_ddr2_ba),
-      .cntrl0_ddr2_cke           (cntrl0_ddr2_cke),
-      .cntrl0_ddr2_cs_n          (cntrl0_ddr2_cs_n),
-      .cntrl0_ddr2_ras_n         (cntrl0_ddr2_ras_n),
-      .cntrl0_ddr2_cas_n         (cntrl0_ddr2_cas_n),
-      .cntrl0_ddr2_we_n          (cntrl0_ddr2_we_n),
-      .cntrl0_ddr2_odt           (cntrl0_ddr2_odt),
-      .cntrl0_ddr2_dm            (cntrl0_ddr2_dm),
-      .cntrl0_ddr2_dqs           (cntrl0_ddr2_dqs),
-      .cntrl0_ddr2_dqs_n         (cntrl0_ddr2_dqs_n),
-      .cntrl0_ddr2_ck            (cntrl0_ddr2_ck),
-      .cntrl0_ddr2_ck_n          (cntrl0_ddr2_ck_n),
-      .cntrl0_rst_dqs_div_in     (cntrl0_rst_dqs_div_in),
-      .cntrl0_rst_dqs_div_out    (cntrl0_rst_dqs_div_out),
- 
-      .clk_int                   (CLK0_OUT),
-      .clk90_int                 (CLK90_OUT),
-      .dcm_lock                  (LOCKED_OUT),
- 
-      .reset_in_n                (1'b1),
-      .cntrl0_burst_done         (cntrl0_burst_done),
-      .cntrl0_init_done          (cntrl0_init_done),
-      .cntrl0_ar_done            (cntrl0_ar_done),
-      .cntrl0_user_data_valid    (cntrl0_user_data_valid),
-      .cntrl0_auto_ref_req       (cntrl0_auto_ref_req),
-      .cntrl0_user_cmd_ack       (cntrl0_user_cmd_ack),
-      .cntrl0_user_command_register  ({cntrl0_user_command_register, 1'b0}),
-      .cntrl0_clk_tb             (cntrl0_clk_tb),
-      .cntrl0_clk90_tb           (cntrl0_clk90_tb),
-  //    .cntrl0_sys_rst_tb         (cntrl0_sys_rst_tb),
-  //    .cntrl0_sys_rst90_tb       (cntrl0_sys_rst90_tb),
-      .cntrl0_sys_rst180_tb      (cntrl0_sys_rst180_tb),
-      .cntrl0_user_output_data   (cntrl0_user_output_data),
-      .cntrl0_user_input_data    (cntrl0_user_input_data),
-      .cntrl0_user_data_mask     (4'b0000),
-      .cntrl0_user_input_address  (cache_op ? {memmap_mux[9:6], memmap_mux[3:0], cache_hi_addr[7:0], cache_counter, 2'b00, memmap_mux[5:4]}: {5'b00001, vga_ddr_row_col, 2'b00, 2'b00})
+		.sys_CLK(clk_sdr),                                              // clock
+		.sys_CMD(cntrl0_user_command_register),                         // 00=nop, 01 = write 64 bytes, 10=read 32 bytes, 11=read 64 bytes
+		.sys_ADDR(sdraddr),                                             // word address
+		.sys_DIN(BIOS_data_valid ? BIOS_data : cntrl0_user_input_data), // data input
+		.sys_DOUT(sys_DOUT),                                            // data output
+		.sys_rd_data_valid(sys_rd_data_valid),                          // data valid read
+		.sys_wr_data_valid(sys_wr_data_valid),                          // data valid write
+		.sys_cmd_ack(sys_cmd_ack),                                      // command acknowledged
+		.sdr_n_CS_WE_RAS_CAS(sdr_n_CS_WE_RAS_CAS),                      // SDRAM #CS, #WE, #RAS, #CAS
+		.sdr_BA(sdr_BA),                                                // SDRAM bank address
+		.sdr_ADDR(sdr_ADDR),                                            // SDRAM address
+		.sdr_DATA(sdr_DATA),                                            // SDRAM data
+		.sdr_DQM(sdr_DQM)                                               // SDRAM DQM
 	);
- 
-	fifo ddr_vga_fifo 
+
+	fifo vga_fifo 
 	(
-	  .rst(cntrl0_sys_rst180_tb), // input rst
-	  .wr_clk(cntrl0_clk90_tb), // input wr_clk
-	  .rd_clk(clk_25), // input rd_clk
-	  .din({cntrl0_user_output_data[7:0], cntrl0_user_output_data[15:8], cntrl0_user_output_data[23:16], cntrl0_user_output_data[31:24]}), // input [31 : 0] din
-	  .wr_en(~crw[3] && cntrl0_user_data_valid),
-	  .rd_en(!fifo_empty && displ_on && (vgatext[1] ? &hcount[2:0] : vga400[1] ? &hcount[1:0] : hcount[0])), // input rd_en
-	  .dout(fifo_dout), // output [15 : 0] dout
-	  .full(full), // output full
-	  .empty(fifo_empty), // output empty
-	  .prog_full(prog_full), // output prog_full
-	  .prog_empty(prog_empty) // output prog_empty
+	  .wrclk(clk_sdr),                                      // input wr_clk
+	  .rdclk(clk_25),                                       // input rd_clk
+	  .data(sys_DOUT),                                      // input [15:0] din
+	  .wrreq(!crw && sys_rd_data_valid && !col_counter[4]), // input wrreq
+	  .rdreq(vrden),                                        // input rdreq
+	  .q(fifo_dout32),                                      // output [31:0] dout
+	  .wrusedw(fifo_wr_used_words)                          // output [8:0]
 	);
- 
+
 	VGA_SG VGA 
 	(
-		.tc_hsblnk(10'd639), 
-		.tc_hssync(10'd655), 
-		.tc_hesync(10'd751), 
-		.tc_heblnk(10'd799), 
-		.hcount(hcount), 
-		.hsync(VGA_HSYNC), 
-		.hblnk(hblnk), 
-		.tc_vsblnk(vga400[2] | vgatext[2] ? 10'd399 : 10'd479), 
-		.tc_vssync(vga400[2] | vgatext[2] ? 10'd411 : 10'd489), 
-		.tc_vesync(vga400[2] | vgatext[2] ? 10'd413 : 10'd491), 
-		.tc_veblnk(vga400[2] | vgatext[2] ? 10'd446 : 10'd520), 
-		.vcount(vcount), 
-		.vsync(VGA_VSYNC), 
-		.vblnk(vblnk), 
+		.tc_hsblnk(10'd639),
+		.tc_hssync(10'd655),
+		.tc_hesync(10'd751),
+		.tc_heblnk(10'd799),
+		.hcount(hcount),
+		.hsync(VGA_HSYNC),
+		.hblnk(hblnk),
+		.tc_vsblnk(v240[2] ? 10'd479 : 10'd399),
+		.tc_vssync(v240[2] ? 10'd489 : 10'd411),
+		.tc_vesync(v240[2] ? 10'd491 : 10'd413),
+		.tc_veblnk(v240[2] ? 10'd524 : 10'd448),
+		.vcount(vcount),
+		.vsync(VGA_VSYNC),
+		.vblnk(vblnk),
 		.clk(clk_25),
-		.ce(!fifo_empty)
+		.ce(FifoStart)
 	);
- 
+
 	VGA_DAC dac 
 	(
-		 .CE(IORQ && CPU_CE && (PORT_ADDR[15:4] == 12'h03c)), 
+		 .CE(VGA_DAC_OE && IORQ && CPU_CE), 
 		 .WR(WR), 
 		 .addr(PORT_ADDR[3:0]), 
 		 .din(CPU_DOUT[7:0]), 
-		 .OE(VGA_DAC_OE), 
 		 .dout(VGA_DAC_DATA), 
 		 .CLK(clk_cpu), 
 		 .VGA_CLK(clk_25), 
-		 .vga_addr(vgatext[1] ? {4'b0000, VGA_MUX} : (vga400[1] ? hcount[1] : hcount[0]) ? fifo_dout[7:0] : fifo_dout[15:8]), 
+		 .vga_addr((vgatext[1] | (~vga13[1] & planar[1])) ? VGA_INDEX : (vga13[1] ? hcount_pan[1] : hcount_pan[0]) ? fifo_dout[15:8] : fifo_dout[7:0]), 
 		 .color(DAC_COLOR),
 		 .vgatext(vgatextreq),
-		 .vga400(vga400req),
+		 .vga13(vga13req),
+		 .half(halfreq),
 		 .vgaflash(vgaflash),
-		 .setindex(INPUT_STATUS_OE && IORQ && CPU_CE)
+		 .setindex(INPUT_STATUS_OE && IORQ && CPU_CE),
+		 .hrzpan(vga_hrzpan_req),
+		 .ppm(ppm),
+		 .ega_attr(EGA_MUX),
+		 .ega_pal_index(VGA_INDEX)
     );
- 
+
 	 VGA_CRT crt
 	 (
 		.CE(IORQ && CPU_CE && VGA_CRT_OE),
 		.WR(WR),
-		.din(CPU_DOUT[7:0]),
+		.WORD(WORD),
+		.din(CPU_DOUT),
 		.addr(PORT_ADDR[0]),
 		.dout(VGA_CRT_DATA),
 		.CLK(clk_cpu),
 		.oncursor(oncursor),
+		.cursorstart(crs[0]),
+		.cursorend(crs[1]),
 		.cursorpos(cursorpos),
-		.scraddr(scraddr)
+		.scraddr(scraddr),
+		.offset(vga_offset),
+		.lcr(lcr),
+		.repln(replnreq),
+		.vde(vde)
 	);
- 
+
+	VGA_SC sc
+	(
+		.CE(IORQ && CPU_CE && VGA_SC), // 3c4, 3c5
+		.WR(WR),
+		.WORD(WORD),
+		.din(CPU_DOUT),
+		.dout(VGA_SC_DATA),
+		.addr(PORT_ADDR[0]),
+		.CLK(clk_cpu),
+		.planarreq(planarreq),
+		.wplane(vga_wplane)
+    );
+
+	VGA_GC gc
+	(
+		.CE(IORQ && CPU_CE && VGA_GC),
+		.WR(WR),
+		.WORD(WORD),
+		.din(CPU_DOUT),
+		.addr(PORT_ADDR[0]),
+		.CLK(clk_cpu),
+		.rplane(vga_rplane),
+		.bitmask(vga_bitmask),
+		.rwmode(vga_rwmode),
+		.setres(vga_setres),
+		.enable_setres(vga_enable_setres),
+		.logop(vga_logop),
+		.color_compare(vga_color_compare),
+		.color_dont_care(vga_color_dont_care),
+		.rotate_count(vga_rotate_count),
+		.dout(VGA_GC_DATA)
+	);
+
 	sr_font VGA_FONT 
 	(
-	  .clka(clk_25), // input clka
-	  .wea(1'b0), // input [0 : 0] wea
-	  .addra({fifo_dout[15:8], vcount[3:0]}), // input [11 : 0] addra
-	  .dina(8'hxx), // input [7 : 0] dina
-	  .douta(font_dout), // output [7 : 0] douta
-	  .clkb(clk_cpu), // input clkb
-	  .web(CPU_CE & WR & IORQ & VGA_FONT_OE & ~WORD), // input [0 : 0] web
-	  .addrb(vga_font_counter), // input [11 : 0] addrb
-	  .dinb(CPU_DOUT[7:0]), // input [7 : 0] dinb
-	  .doutb(VGA_FONT_DATA) // output [7 : 0] doutb
+		.clock_a(clk_25),                                  // input clka
+		.wren_a(1'b0),                                     // input [0:0] wea
+		.address_a({fifo_dout[7:0], char_ln}),             // input [11:0] addra
+		.data_a(8'h00),                                    // input [7:0] dina
+		.q_a(font_dout),                                   // output [7:0] douta
+		.clock_b(clk_cpu),                                 // input clkb
+		.wren_b(WR & IORQ & VGA_FONT_OE & ~WORD & CPU_CE), // input [0:0] web
+		.address_b(vga_font_counter),                      // input [11:0] addrb
+		.data_b(CPU_DOUT[7:0]),                            // input [7:0] dinb
+		.q_b(VGA_FONT_DATA)                                // output [7:0] doutb
 	);
- 
+
 	cache_controller cache_ctl 
 	(
-		 .addr(ADDR), 
-		 .dout(DRAM_dout), 
-		 .din(DOUT), 
-		 .clk(clk_cpu), 
-		 .mreq(MREQ), 
-		 .wr(WR),
-		 .wmask(RAM_WMASK),	 
-		 .ce(CE), 
-		 .ddr_din(cntrl0_user_output_data), 
-		 .ddr_dout(cntrl0_user_input_data), 
-		 .ddr_clk(cntrl0_clk90_tb), 
-		 .ddr_rd(ddr_rd), 
-		 .ddr_wr(ddr_wr),
-		 .lowaddr(lowaddr),
-		 .waddr(waddr),
-		 .cache_write_data(crw[3] && cntrl0_user_data_valid) // read DDR, write to cache
+		.addr(ADDR),
+		.dout(DRAM_dout),
+		.din(DOUT),
+		.clk(clk_cpu),
+		.mreq(MREQ),
+		.wmask(RAM_WMASK),
+		.ce(CE),
+		.cpu_speed(cpu_speed),
+		.ddr_din(sys_DOUT),
+		.ddr_dout(cntrl0_user_input_data),
+		.ddr_clk(clk_sdr),
+		.ddr_rd(ddr_rd),
+		.ddr_wr(ddr_wr),
+		.hiaddr(cache_hi_addr),
+		.cache_write_data(crw && sys_rd_data_valid),
+		.cache_read_data(crw && sys_wr_data_valid),
+		//.flush(auto_flush==2'b01) // decod81
+		.flush(auto_flush==2'b10) // decod81
 	);
- 
+
 	wire I_KB;
 	wire I_MOUSE;
 	wire KB_RST;
 	KB_Mouse_8042 KB_Mouse 
 	(
-		 .CS(IORQ && CPU_CE && PORT_ADDR[15:4] == 12'h006 && {PORT_ADDR[3], PORT_ADDR[1:0]} == 3'b000), // 60h, 64h
+		 .CS(IORQ && CPU_CE && KB_OE), // 60h, 64h
 		 .WR(WR), 
 		 .cmd(PORT_ADDR[2]), // 64h
 		 .din(CPU_DOUT[7:0]), 
-		 .OE(KB_OE), 
 		 .dout(KB_DOUT), 
 		 .clk(clk_cpu), 
 		 .I_KB(I_KB), 
 		 .I_MOUSE(I_MOUSE), 
 		 .CPU_RST(KB_RST), 
-		 .PS2_CLK1(PS2_CLK1), 
-		 .PS2_CLK2(PS2_CLK2), 
-		 .PS2_DATA1(PS2_DATA1), 
-		 .PS2_DATA2(PS2_DATA2)
+		 .PS2_CLK1_I(PS2_CLK1_I),
+		 .PS2_CLK1_O(PS2_CLK1_O),
+		 .PS2_CLK2_I(PS2_CLK2_I),
+		 .PS2_CLK2_O(PS2_CLK2_O),
+		 .PS2_DATA1_I(PS2_DATA1_I),
+		 .PS2_DATA1_O(PS2_DATA1_O),
+		 .PS2_DATA2_I(PS2_DATA2_I),
+		 .PS2_DATA2_O(PS2_DATA2_O)
 	);
- 
+
 	wire [7:0]PIC_IVECT;
 	wire INT;
 	wire timer_int;
 	PIC_8259 PIC 
 	(
-		 .CS((PORT_ADDR[15:8] == 8'h00) && (PORT_ADDR[6:0] == 7'b0100001) && IORQ && CPU_CE), // 21h, a1h
+		 .RST(!rstcount[18]),
+		 .CS(PIC_OE && IORQ && CPU_CE), // 21h, a1h
 		 .WR(WR), 
 		 .din(CPU_DOUT[7:0]), 
-		 .OE(PIC_OE), 
+		 .slave(PORT_ADDR[7]),
 		 .dout(PIC_DOUT), 
 		 .ivect(PIC_IVECT), 
 		 .clk(clk_cpu), 
 		 .INT(INT), 
 		 .IACK(INTA & CPU_CE), 
-		 .I({I_MOUSE, RTCEND, I_KB, timer_int})
-//		 .I({hblnk, 1'b0, vblnk, timer_int})
+		 .I({I_COM1, I_MOUSE, RTCEND, I_KB, timer_int})
     );
- 
+
+	wire [3:0]seg_addr;
+	wire vga_planar_seg;
 	unit186 CPUUnit
 	(
-		 .INPORT(INTA ? PIC_IVECT : PORT_IN), 
+		 .INPORT(INTA ? {8'h00, PIC_IVECT} : PORT_IN), 
 		 .DIN(DRAM_dout), 
 		 .CPU_DOUT(CPU_DOUT),
 		 .PORT_ADDR(PORT_ADDR),
+		 .SEG_ADDR(seg_addr),
 		 .DOUT(DOUT), 
 		 .ADDR(ADDR), 
 		 .WMASK(RAM_WMASK), 
 		 .CLK(clk_cpu), 
 		 .CE(CE), 
 		 .CPU_CE(CPU_CE),
+		 .CE_186(CE_186),
 		 .INTR(INT), 
-		 .NMI(rNMI[9]), 
-		 .RST(BTN_SOUTH || !rstcount[4]), 
+		 .RST(!rstcount[18]), 
 		 .INTA(INTA), 
-//		 .LOCK(LOCK), 
-		 .HALT(FPGA_AWAKE), 
+		 .LOCK(LOCK), 
+		 .HALT(HALT), 
 		 .MREQ(MREQ),
 		 .IORQ(IORQ),
 		 .WR(WR),
-		 .WORD(WORD)
+		 .WORD(WORD),
+		 .FASTIO(1'b1),
+		 
+		 .VGA_SEL(planarreq && vga_planar_seg),
+		 .VGA_WPLANE(vga_wplane),
+		 .VGA_RPLANE(vga_rplane),
+		 .VGA_BITMASK(vga_bitmask),
+		 .VGA_RWMODE(vga_rwmode),
+		 .VGA_SETRES(vga_setres),
+		 .VGA_ENABLE_SETRES(vga_enable_setres),
+		 .VGA_LOGOP(vga_logop),
+		 .VGA_COLOR_COMPARE(vga_color_compare),
+		 .VGA_COLOR_DONT_CARE(vga_color_dont_care),
+		 .VGA_ROTATE_COUNT(vga_rotate_count)
 	);
- 
+	
 	seg_map seg_mapper 
 	(
-		 .CLK(clk_cpu), 
-		 .addr(PORT_ADDR[3:0]), 
-		 .rdata(memmap), 
-		 .wdata(CPU_DOUT[9:0]), 
-		 .addr1(cache_hi_addr[11:8]), 
-		 .data1(memmap_mux), 
-		 .WE(MEMORY_MAP & WR & WORD & IORQ & CPU_CE)
+		 .CLK(clk_cpu),
+		 .cpuaddr(PORT_ADDR[3:0]), 
+		 .cpurdata(memmap), 
+		 .cpuwdata(CPU_DOUT[8:0]), 
+		 .memaddr(cache_hi_addr[14:10]), 
+		 .memdata(memmap_mux), 
+		 .WE(MEMORY_MAP & WR & WORD & IORQ & CPU_CE),
+		 .seg_addr(seg_addr),
+		 .vga_planar_seg(vga_planar_seg)
     );
- 
+
 	 wire timer_spk;
-	 timer_8253 timer 
+	 timer_8253 timer
 	 (
-		 .CS(PORT_ADDR[15:2] == 14'b00000000010000 && IORQ && CPU_CE), 
+		 .CS(TIMER_OE && IORQ && CPU_CE), 
 		 .WR(WR), 
 		 .addr(PORT_ADDR[1:0]), 
 		 .din(CPU_DOUT[7:0]), 
-		 .OE(TIMER_OE), 
 		 .dout(TIMER_DOUT), 
 		 .CLK_25(clk_25), 
 		 .clk(clk_cpu), 
-		 .out0(timer_int), 
+		 .out0(timer_int),
 		 .out2(timer_spk)
     );
-	 assign AUD_L = speaker_on & timer_spk;
-	 assign AUD_R = speaker_on & timer_spk; 
- 
-	always @ (negedge cntrl0_clk_tb) begin
-		cntrl0_user_command_register <= 2'b00;
-		cntrl0_burst_done <= 1'b0;
-		s_prog_full <= prog_full; // sychronized because prog_full is asserted on a different clock
-		s_prog_empty <= prog_empty;
+
+/*
+	soundwave sound_gen
+	(
+		.CLK(clk_cpu),
+		.CLK44100x256(CLK44100x256),
+		.data(CPU_DOUT),
+		.we(IORQ & CPU_CE & WR & PARALLEL_PORT),
+		.word(WORD),
+		.opl3left(opl3left),
+		.opl3right(opl3right),
+		.stb44100(stb44100),
+		.full(sq_full), // when not full, write max 2x1152 16bit samples
+		.dss_full(dss_full),
+		.AUDIO_L(AUD_L),
+		.AUDIO_R(AUD_R)
+	);
+
+    opl3 opl3_inst (
+		.clk(clk_OPL),
+		.cpu_clk(clk_cpu),
+		.addr(PORT_ADDR[1:0]),
+		.din(CPU_DOUT[7:0]),
+		.dout(opl32_data),
+		.ce(IORQ & CPU_CE & OPL3_PORT),
+		.wr(WR),
+		.left(opl3left),
+		.right(opl3right),
+		.stb44100(stb44100),
+		.reset(!rstcount[18])
+	);
+*/
+
+	reg nop;
+	reg fifo_fill = 1;
+	always @ (posedge clk_sdr) begin
+		s_prog_full <= fifo_wr_used_words > 350; // AlmostFull
+		if(fifo_wr_used_words < 64) s_prog_empty <= 1'b1; // AlmostEmpty
+		else begin
+			s_prog_empty <= 1'b0;
+			FifoStart <= 1'b1;
+		end
 		s_ddr_rd <= ddr_rd;
 		s_ddr_wr <= ddr_wr;
-		s_ddr_endburst <= s_prog_full || cntrl0_auto_ref_req || (~s_prog_empty && (s_ddr_rd || s_ddr_wr));
-		crw_start <= 1'b0;
-		cww[1] <= cww[0];
-		if(cntrl0_auto_ref_req) rfsh <= 1'b1;
-		else if(cntrl0_ar_done) rfsh <= 1'b0;
- 
-		if(cntrl0_sys_rst180_tb) begin
-			STATE <= 4'b0000;
-			vga_ddr_row_col <= 0;
-			vga_ddr_row_count <= 0;
-			cache_counter <= 0;
-			vga_repln_count <= 0;
-			vga_lnbytecount <= 0;
-		end else case(STATE)
-			4'b0000: begin
-				cntrl0_user_command_register <= 2'b01;	// initialize DDR
-				STATE <= 4'b0001;	// reset
-			end
- 
-// wait for completion
-			4'b0001: begin
-				if(~cntrl0_user_cmd_ack && cntrl0_init_done && ~rfsh && ~cntrl0_auto_ref_req) begin
-					if(s_prog_empty) begin
-						cntrl0_user_command_register <= 2'b11;
-						STATE <= 4'b0010;
-					end else if(s_ddr_wr) begin
-						cntrl0_user_command_register <= 2'b10;
-						cache_op <= 1'b1;
-						cww[0] <= 1'b1;
-						STATE <= 4'b0110;
-					end else if(s_ddr_rd) begin
-						cntrl0_user_command_register <= 2'b11;
-						cache_op <= 1'b1;
-						STATE <= 4'b1010;
-					end else if(~s_prog_full) begin
-						cntrl0_user_command_register <= 2'b11;
-						STATE <= 4'b0010;
-					end
-				end
-			end
- 
-// VGA read
-			4'b0010: begin	// assert READ command, wait for ACK
-				cntrl0_user_command_register <= 2'b11; // read
-				if(cntrl0_user_cmd_ack) STATE <= 4'b0011;
-			end
-			4'b0011: begin // keep READ for 2nd T after ACK
-				cntrl0_user_command_register <= 2'b11; // read
-				STATE <= 4'b0100;
-			end
-			4'b0100: begin	// keep READ for 3rd T after ACK
-				cntrl0_user_command_register <= 2'b11; // read
- 
-				if(vga_end_line) begin
-					vga_lnbytecount <= 0;
-					vga_ddr_row_count <= vga_ddr_row_count + 1;
-					if(vga_repeat_line) begin
-						vga_repln_count <= vga_repln_count + 1;
-						vga_ddr_row_col <= vga_ddr_row_col - vga_lnend;
-					end else begin
-						vga_repln_count <= 0;
-						if(vga_end_frame) begin
-							vga400[0] <= vga400req;
-							vgatext[0] <= vgatextreq;
-							vga_ddr_row_col <= scraddr + {vgatext[0] ? 4'b0111 : 4'b0100, 12'h000};
-							vga_ddr_row_count <= 0;
-						end else vga_ddr_row_col <= vga_ddr_row_col + 1;
-					end
-				end else begin
-					vga_lnbytecount <= vga_lnbytecount + 1;
-					vga_ddr_row_col <= vga_ddr_row_col + 1;
-				end
- 
-//				vga_ddr_row_col <= vga_ddr_row_col == vga_ddr_row_col_end ? vga_ddr_row_col_start : vga_ddr_row_col + 1; 
-				if(s_ddr_endburst || &vga_ddr_row_col[7:0] || ((vga_end_frame || vga_repeat_line) && vga_end_line)) begin // end burst if (FIFO full or DDR refresh or end column address)
-					cntrl0_burst_done <= 1'b1;
-					STATE <= 4'b0101;	// end burst
-				end else STATE <= 4'b0011;	// continue read burst
-			end
-			4'b0101: begin	// keep burst_done
-				cntrl0_burst_done <= 1'b1;
-				cache_op <= 1'b0;
-				STATE <= 4'b0001;
-			end
- 
-// cache write to DDR
-			4'b0110: begin // assert WRITE command, wait for ACK
-				cntrl0_user_command_register <= 2'b10; // write
-				if(cntrl0_user_cmd_ack) STATE <= 4'b0111;
-			end
-			4'b0111: begin // keep WRITE for 2nd T after ACK
-				cntrl0_user_command_register <= 2'b10; // write
-				if(cntrl0_auto_ref_req || ccd) cww[0] <= 1'b0;
-				STATE <= 4'b1000;
-			end
-			4'b1000: begin // keep WRITE for 3rd T after ACK
-				cntrl0_user_command_register <= 2'b10; // write
-				cache_counter <= cache_counter + 1;
-				if(~cww[0]) begin
-					cntrl0_burst_done <= 1'b1;
-					STATE <= ccd ? 4'b0101 : 4'b1001;
-				end else STATE <= 4'b0111;
-			end
-			4'b1001: begin
-				cntrl0_burst_done <= 1'b1;
-				STATE <= 4'b1110;
-			end
-			4'b1110: begin
-				if(~cntrl0_user_cmd_ack) begin
-					cntrl0_user_command_register <= 2'b10; // write
-					cww[0] <= 1'b1;
-					STATE <= 4'b0110;
-				end
-			end
- 
-// cache read from DDR
-			4'b1010: begin // assert READ command, wait for ACK
-				cntrl0_user_command_register <= 2'b11; // read
-				if(cntrl0_user_cmd_ack) STATE <= 4'b1011;
-			end
-			4'b1011: begin // keep READ for 2nd T after ACK
-				crw_start <= 1'b1;
-				cntrl0_user_command_register <= 2'b11; // read
-				STATE <= 4'b1100;
-			end
-			4'b1100: begin	// keep READ for 3rd T after ACK
-				cntrl0_user_command_register <= 2'b11; // read
-				cache_counter <= cache_counter + 1;
-				if(cntrl0_auto_ref_req || ccd) begin
-					cntrl0_burst_done <= 1'b1;
-					STATE <= ccd ? 4'b0101 : 4'b1101;
-				end else STATE <= 4'b1011;
-			end
-			4'b1101: begin	// keep burst_done
-				cntrl0_burst_done <= 1'b1;
-				STATE <= 4'b1111;
-			end
-			4'b1111: begin
-				if(~cntrl0_user_cmd_ack) begin
-					cntrl0_user_command_register <= 2'b11; // read
-					STATE <= 4'b1010;
-				end
-			end
- 
+		s_vga_endline <= vga_repln_count == vga_repln;
+		s_vga_endframe <= vga_end_frame;
+		nop <= sys_cmd_ack == 2'b00;
+
+		sdraddr <= BIOS_WR ? BIOS_BASE + (BIOS_ADDR >> 1) : (s_prog_empty && fifo_fill) || !(s_ddr_wr || s_ddr_rd) ? {6'b000001, vga_ddr_row_col + vga_lnbytecount} : {memmap_mux[8:0], cache_hi_addr[9:0], 4'b0000};
+		max_read <= &sdraddr[7:3] ? ~sdraddr[2:0] : 3'b111; // SDRAM row size = 512 words
+
+		BIOS_data_valid <= BIOS_WR;
+		BIOS_data <= BIOS_DIN;
+
+		if(BIOS_WR) cntrl0_user_command_register <= 2'b01;
+		else if(s_prog_empty && fifo_fill) cntrl0_user_command_register <= 2'b10;	// read 32 bytes VGA
+		else if(s_ddr_wr) cntrl0_user_command_register <= 2'b01;		   // write 256 bytes cache
+		else if(s_ddr_rd) cntrl0_user_command_register <= 2'b11;		   // read 256 bytes cache
+		else if(~s_prog_full && fifo_fill) cntrl0_user_command_register <= 2'b10;	// read 32 bytes VGA
+		else cntrl0_user_command_register <= 2'b00;
+
+		if(!crw && sys_rd_data_valid) col_counter <= col_counter - 1'b1;
+		if(nop) case(sys_cmd_ack)
+			2'b10: begin
+				crw <= 1'b0; // VGA read
+				col_counter <= {1'b0, max_read, 1'b1};
+				vga_lnbytecount <= vga_lnbytecount + max_read + 1'b1;
+			end					
+			2'b01, 2'b11: crw <= !BIOS_WR; // cache read/write
 		endcase
+		if(vcount==445) fifo_fill <= 1;
+		if(s_vga_endscanline)
+		begin
+			col_counter[3:1] <= col_counter[3:1] - vga_lnbytecount[2:0];
+			vga_lnbytecount <= 0;
+			s_vga_endscanline <= 1'b0;
+			if(s_vga_endframe) vga_ddr_row_col <= {{1'b0, scraddr[15:13]} + (vgatext[0] ? 4'b0111 : 4'b0100), scraddr[12:0]};
+			else if({1'b0, vga_ddr_row_count} == lcr) vga_ddr_row_col <= vgatext[0] ? 17'he000 : 17'h8000; 
+			else if(s_vga_endline) vga_ddr_row_col <= vga_ddr_row_col + (vgatext[0] ? 40 : {vga_offset, 1'b0});
+			if(s_vga_endline) vga_repln_count <= 0;
+			else vga_repln_count <= vga_repln_count + 1'b1;
+			if(s_vga_endframe) begin
+				vga13[0] <= vga13req;
+				vgatext[0] <= vgatextreq;
+				v240[0] <= vde >= 10'd400;
+				planar[0] <= planarreq;
+				half[0] <= halfreq;
+				repln_graph[0] <= replnreq;
+				vga_ddr_row_count <= 0;
+				fifo_fill <= 0;
+			end else vga_ddr_row_count <= vga_ddr_row_count + 1'b1;
+		end else s_vga_endscanline <= (vga_lnbytecount[7:3] == vga_lnend);
 	end
- 
- 
-	always @ (posedge cntrl0_clk90_tb) begin
-		if(cntrl0_sys_rst180_tb) begin
-			crw <= 0;
-			lowaddr <= 0;
-		end else begin
-			if((crw[3] && cntrl0_user_data_valid) || (cww[0] && cntrl0_user_cmd_ack)) lowaddr <= lowaddr + 1;
-			if(~crw[3]) begin
-				if(crw_start || |crw[2:0]) crw <= crw + 1;
-			end else if(&lowaddr) crw <= 0;
-		end
-	end
- 
-	always @ (posedge clk_cpu) begin
-		s_RS232_DCE_RXD <= RS232_DCE_RXD;
+
+	always @ (posedge clk_cpu)
+	begin
 		if(IORQ & CPU_CE) begin
-			if(WR & RS232_OE) RS232_DCE_TXD <= CPU_DOUT[0];
-			if(VGA_FONT_OE) vga_font_counter <= WR && WORD ? {CPU_DOUT[7:0], 4'b0000} : vga_font_counter + 1; 
-			if(WR & SPEAKER_PORT) speaker_on <= &CPU_DOUT[1:0];
-//			if(WR & LED_PORT) LED <= CPU_DOUT[7:0];
+			if(VGA_FONT_OE) vga_font_counter <= WR && WORD ? {CPU_DOUT[7:0], 4'b0000} : vga_font_counter + 1'b1; 
 		end
-// SD
 		if(CPU_CE) begin
 			SD_CK <= IORQ & INPUT_STATUS_OE & WR & ~WORD;
 			if(IORQ & INPUT_STATUS_OE & WR) begin
-				if(WORD) SD_CS <= ~CPU_DOUT[8]; // SD chip select
+				if(WORD) SD_n_CS <= ~CPU_DOUT[8];
 				else SDI <= {SDI[6:0], SD_DO};
 			end
 		end
- 
-		if(KB_RST) rstcount <= 0;
-		else if(CPU_CE && ~rstcount[4]) rstcount <= rstcount + 1;
- 
-// RTC		
-		RTCSYNC <= {RTCSYNC[0], RTCDIVEND};
-		if(IORQ && CPU_CE && WR && WORD && RTC_SELECT) begin
-			RTC <= 0;
-			RTCSET <= CPU_DOUT;
-		end else if(RTCSYNC == 2'b01) begin
-			if(RTCEND) RTC <= 0;
-			else RTC <= RTC + 1;
-		end
- 
+		if(KB_RST || BTN_RESET) rstcount <= 0;
+		else if(CPU_CE && ~rstcount[18]) rstcount <= rstcount + 1'b1;
+		auto_flush[1:0] <= {auto_flush[0], vblnk}; // decod81
+		//auto_flush[1:0] <= {auto_flush[0], hblnk}; // decod81
 	end
- 
-	always @ (posedge clk_25) begin
-		s_displ_on[1:0] <= {s_displ_on[0], displ_on};
-		vga_attr <= fifo_dout[7:0];
- 
-		flash_on <= (vgaflash & fifo_dout[7] & flashcount[5]) | (~oncursor && flashcount[4] && (charcount == cursorpos) && ((vcount[3:0] == 13) || vcount[3:0] == 14));		
- 
+
+	always @ (posedge clk_25)
+	begin
+		s_displ_on <= {s_displ_on[17:0], displ_on};
+		exline <= vrdon ? 4'b1111 : (exline - vrden);
+		vga_attr <= fifo_dout[15:8];
+		flash_on <= (vgaflash & fifo_dout[15] & flashcount[5]) | (~oncursor && flashcount[4] && (charcount == cursorpos) && (char_ln >= crs[0][3:0]) && (char_ln <= crs[1][3:0]));
 		if(!vblnk) begin
 			flashbit <= 1;
-			vga400[2] <= vga400[1];
+			vga13[2] <= vga13[1];
 			vgatext[2] <= vgatext[1];
+			v240[2] <= v240[1];
+			planar[2] <= planar[1];
+			half[2] <= half[1];
 		end else if(flashbit) begin
-			flashcount <= flashcount + 1;
+			flashcount <= flashcount + 1'b1;
 			flashbit <= 0;
-			vga400[1] <= vga400[0];
+			vga13[1] <= vga13[0];
 			vgatext[1] <= vgatext[0];
+			v240[1] <= v240[0];
+			planar[1] <= planar[0];
+			half[1] <= half[0];
 		end
- 
-		if(RTCDIVEND) RTCDIV25 <= 0;	// real time clock
-		else RTCDIV25 <= RTCDIV25 + 1;
- 
-		if(!BTN_WEST) rNMI <= 0;		// NMI
-		else if(!rNMI[9] && RTCDIVEND) rNMI <= rNMI + 1;	// 1Mhz increment
- 
+		if(VGA_VSYNC) vga_hrzpan <= half[0] ? {vga_hrzpan_req[2:0], 1'b0} : {1'b0, vga_hrzpan_req[2:0]};
+		else if(VGA_HSYNC && ppm && (vcount == lcr)) vga_hrzpan <= 4'b0000;
+		{VGA_B, VGA_G, VGA_R} <= DAC_COLOR & {18{sdon}};
 	end
- 
+	
 endmodule

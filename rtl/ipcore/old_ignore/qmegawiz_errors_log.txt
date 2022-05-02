@@ -1,0 +1,25 @@
+
+
+C:/NoSync/MiSTer/MyCores/Next186core/rtl/ipcore/cache.v
+
+May 02 06PM:44:17>: The following design file, which has identical name but a different extension 
+from the specified variation file, already exists in the working directory:
+
+cache.vhd
+
+This may create a conflict of design files and/or lead to undesirable side
+effects.
+
+Is it OK to continue file generation?
+
+C:/NoSync/MiSTer/MyCores/Next186core/rtl/ipcore/cache.v
+
+May 02 06PM:45:19>: The following design file, which has identical name but a different extension 
+from the specified variation file, already exists in the working directory:
+
+cache.vhd
+
+This may create a conflict of design files and/or lead to undesirable side
+effects.
+
+Is it OK to continue file generation?

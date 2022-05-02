@@ -288,6 +288,13 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_*
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BTN_*
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to BTN_*
 source files.qip
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cache_controller.sv
+set_global_assignment -name VERILOG_FILE rtl/ipcore/cache.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/fifo.v
+set_global_assignment -name VERILOG_FILE rtl/KB_8042.v
+set_global_assignment -name VERILOG_FILE rtl/PIC_8259.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/sr_font.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/sdram.v
 set_global_assignment -name VERILOG_FILE rtl/timer8253.v
 set_global_assignment -name VERILOG_FILE rtl/unit186.v
 set_global_assignment -name VHDL_FILE rtl/ipcore/cache.vhd

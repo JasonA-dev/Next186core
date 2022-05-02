@@ -42,33 +42,33 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-
+ 
 `timescale 1 ns / 1 ps
-
+ 
 module VGA_SG
   (
   input  wire	[9:0]	tc_hsblnk,
   input  wire	[9:0]	tc_hssync,
   input  wire	[9:0]	tc_hesync,
   input  wire	[9:0]	tc_heblnk,
-
+ 
   output reg	[9:0]	hcount = 0,
   output reg			hsync,
   output reg			hblnk = 0,
-
+ 
   input  wire	[9:0]	tc_vsblnk,
   input  wire	[9:0]	tc_vssync,
   input  wire	[9:0]	tc_vesync,
   input  wire	[9:0]	tc_veblnk,
-
+ 
   output reg	[9:0]	vcount = 0,
   output reg			vsync,
   output reg			vblnk = 0,
-
+ 
   input  wire			clk,
   input  wire			ce
   );
-
+ 
   //******************************************************************//
   // This logic describes a 10-bit horizontal position counter.       //
   //******************************************************************//
@@ -83,7 +83,7 @@ module VGA_SG
 			end
 			hsync <= (hcount >= tc_hssync) && (hcount < tc_hesync);
 		end
-		
+ 
   //******************************************************************//
   // This logic describes a 10-bit vertical position counter.         //
   //******************************************************************//
@@ -98,7 +98,7 @@ module VGA_SG
 			end
 			vsync <= (vcount >= tc_vssync) && (vcount < tc_vesync);
 		end
-
+ 
   //******************************************************************//
   // This is the logic for the horizontal outputs.  Active video is   //
   // always started when the horizontal count is zero.  Example:      //
@@ -118,7 +118,7 @@ module VGA_SG
   // active time = (tc_hsblnk + 1) pixels                             //
   //                                                                  //
   //******************************************************************//
-
+ 
   //******************************************************************//
   // This is the logic for the vertical outputs.  Active video is     //
   // always started when the vertical count is zero.  Example:        //
@@ -137,39 +137,32 @@ module VGA_SG
   // active time = (tc_vsblnk + 1) lines                              //
   //                                                                  //
   //******************************************************************//
-
-
+ 
+ 
 endmodule
-
-
+ 
+ 
 module VGA_DAC(
     input CE,
 	 input WR,
     input [3:0]addr,
 	 input [7:0]din,
+	 output OE,
 	 output [7:0]dout,
 	 input CLK,
 	 input VGA_CLK,
 	 input [7:0]vga_addr,
 	 input setindex,
-	 output [17:0]color,
-	 output reg vgatext = 1'b1,
-	 output reg vga13 = 1'b1,
-	 output reg vgaflash = 0,
-	 output reg half = 0,
-	 output reg [3:0]hrzpan = 0,
-	 output reg ppm = 0, // pixel panning mode
-	 input [3:0]ega_attr,
-	 output [7:0]ega_pal_index
+	 output [11:0]color,
+	 output reg vgatext = 1,
+	 output reg vga400 = 1,
+	 output reg vgaflash = 0
     );
-
-	initial vgatext = 1'b1;
-	initial vga13 = 1'b1;
-	
+ 
 	reg [7:0]mask = 8'hff;
 	reg [9:0]index = 0;
 	reg mode = 0;
-	reg [4:0]a0index = 0;
+	reg a0mode = 0;
 	reg a0data = 0;
 	wire [7:0]pal_dout;
 	wire [31:0]pal_out;
@@ -178,15 +171,7 @@ module VGA_DAC(
 	wire addr8 = addr == 8;
 	wire addr9 = addr == 9;
 	wire addr0 = addr == 0;
-	reg [5:0]egapal[15:0];
-	initial $readmemh("egapal.mem", egapal);
-	reg p54s = 1'b0;
-	reg [3:0]colsel = 4'b0000;
-	wire [5:0]egacolor = egapal[ega_attr]; 
-	assign ega_pal_index = {colsel[3:2], p54s ? colsel[1:0] : egacolor[5:4], egacolor[3:0]};
-	reg [7:0]store[5'h14:0];
-	reg [7:0]attrib;
-
+ 
 	DAC_SRAM vga_dac 
 	(
 	  .clock_a(CLK), // input clka
@@ -194,35 +179,32 @@ module VGA_DAC(
 	  .address_a(index), // input [9 : 0] addra
 	  .data_a(din), // input [7 : 0] dina
 	  .q_a(pal_dout), // output [7 : 0] douta
+
 	  .clock_b(VGA_CLK), // input clkb
 	  .wren_b(1'b0), // input [0 : 0] web
 	  .address_b(vga_addr & mask), // input [7 : 0] addrb
-	  .data_b(32'h00000000), // input [31 : 0] dinb
+	  .data_b(32'hxxxxxxxx), // input [31 : 0] dinb
 	  .q_b(pal_out) // output [31 : 0] doutb
 	);
-	
-	assign color = {pal_out[21:16], pal_out[13:8], pal_out[5:0]};
-	assign dout = addr6 ? mask : addr7 ? {6'bxxxxxx, mode, mode} : addr8 ? index[9:2] : addr9 ? pal_dout : attrib;
-	
+ 
+	assign color = {pal_out[21:18], pal_out[13:10], pal_out[5:2]};
+	assign dout = addr6 ? mask : addr7 ? {6'bxxxxxx, mode, mode} : addr8 ? index[9:2] : pal_dout;
+	assign OE = CE & (addr6 | addr7 | addr8 | addr9);
+ 
 	always @(posedge CLK) begin
-	
+ 
 		if(setindex) a0data <= 0;
 		else if(CE && addr0 && WR) a0data <= ~a0data;
-	
+ 
 		if(CE) begin
 			if(addr0) begin
-				if(WR) begin					
-					if(a0data) begin
-						if(!a0index[4]) egapal[a0index[3:0]] <= din[5:0];
-						else case(a0index[3:0]) 
-							4'h0: {p54s, vga13, ppm, half, vgaflash, vgatext} <= {din[7:3], ~din[0]};
-							4'h3: hrzpan <= din[3:0];
-							4'h4: colsel <= din[3:0];
-						endcase 
-						store[a0index] <= din;
-					end else begin
-						a0index <= din[4:0];
-						attrib <= store[din[4:0]];
+				if(WR) begin
+					if(~a0data && (din[4:0] == 5'h10)) a0mode <= 1;
+					else a0mode <= 0;
+					if(a0mode) begin
+						vgatext <= ~din[0];
+						vga400 <= din[6];
+						vgaflash <= din[3];
 					end
 				end
 			end 
@@ -233,143 +215,33 @@ module VGA_DAC(
 			end else if(addr9) index <= index + (index[1:0] == 2'b10 ? 2 : 1);
 		end
 	end
-
+ 
 endmodule
-
-
-
+ 
+ 
+ 
 module VGA_CRT(
     input CE,
 	 input WR,
-	 input WORD,
-	 input [15:0]din,
+	 input [7:0]din,
 	 input addr,
 	 output [7:0]dout,
 	 input CLK,
 	 output reg oncursor,
-	 output reg [4:0]cursorstart,
-	 output reg [4:0]cursorend,
-	 output reg [11:0]cursorpos,
-	 output reg [15:0]scraddr,
-	 output reg [7:0]offset = 8'h28,
-	 output reg [9:0]lcr = 10'h3ff, // line compare register
-	 output reg repln = 1'b0,		// line repeat count - 1 for graphics mode only
-	 output reg [9:0]vde = 10'h18f	// last display visible scan line (i.e. 399 in text mode)
+	 output wire [11:0]cursorpos,
+	 output wire [15:0]scraddr
     );
-	
-	initial offset = 8'h28;
-	initial lcr = 10'h3ff;
-	initial vde = 10'h18f;	// 400 lines
-	
-	reg [4:0]idx_buf = 0;
-	reg [7:0]store[5'h18:0];
-	wire [4:0]index = addr ? idx_buf : din[4:0];
-	wire [7:0]data = addr ? din[7:0] : din[15:8];
-	reg [7:0]dout1;
-	assign dout = addr ? dout1 : {3'b000, idx_buf};
-	 
-	always @(posedge CLK) begin
-		if(CE && WR) begin
-			if(!addr) idx_buf <= din[4:0];
-			if(addr || WORD) begin
-				store[index] <= data;
-				case(index)
-					5'h7: {vde[9:8], lcr[8]} <= {data[6], data[1], data[4]};
-					5'h9: {lcr[9], repln} <= {data[6], data[0] | data[7]};
-					5'ha: {oncursor, cursorstart} <= data[5:0];
-					5'hb: cursorend <= data[4:0];
-					5'hc: scraddr[15:8] <= data;
-					5'hd: scraddr[7:0] <= data;
-					5'he: cursorpos[11:8] <= data[3:0];
-					5'hf: cursorpos[7:0] <= data;
-					5'h12: vde[7:0] <= data;
-					5'h13: offset <= data;
-					5'h18: lcr[7:0] <= data;
-				endcase
-			end
-		end
-		dout1 <= store[idx_buf];
-	end
-endmodule
-
-
-module VGA_SC(
-    input CE,
-	 input WR,
-	 input WORD,
-	 input [15:0]din,
-	 output [7:0]dout,
-	 input addr,
-	 input CLK,
-	 output reg planarreq,
-	 output reg[3:0]wplane
-    );
-	
-	reg [2:0]idx_buf = 0;
-	wire [2:0]index = addr ? idx_buf : din[2:0];
-	wire [7:0]data = addr ? din[7:0] : din[15:8];
-	reg [7:0]dout1;
-	assign dout = addr ? dout1 : {5'b00000, idx_buf};
-	 
-	always @(posedge CLK) begin 
-		if(CE && WR) begin
-			if(!addr) idx_buf <= din[2:0];
-			if(addr || WORD) begin
-				if(index == 2) wplane <= data[3:0];
-				if(index == 4) planarreq <= ~data[3];
-			end
-		end
-		dout1 <= {4'b0000, idx_buf == 2 ? wplane : {~planarreq, 3'b000}};
-	end
-endmodule
-
-
-module VGA_GC(
-    input CE,
-	 input WR,
-	 input WORD,
-	 input [15:0]din,
-	 output [7:0]dout,
-	 input addr,
-	 input CLK,
-	 output reg [1:0]rplane = 2'b00,
-	 output reg[7:0]bitmask = 8'b11111111,
-	 output reg [2:0]rwmode = 3'b000,
-	 output reg [3:0]setres = 4'b0000,
-	 output reg [3:0]enable_setres = 4'b0000,
-	 output reg [1:0]logop = 2'b00,
-	 output reg [3:0]color_compare = 4'b0000,
-	 output reg [3:0]color_dont_care = 4'b1111,
-	 output reg [2:0]rotate_count = 3'b000
-    );
-	
-	initial bitmask = 8'b11111111;
-	initial color_dont_care = 4'b1111;
-	
-	reg [3:0]idx_buf = 0;
-	reg [7:0]store[8:0];
-	wire [3:0]index = addr ? idx_buf : din[3:0];
-	wire [7:0]data = addr ? din[7:0] : din[15:8];
-	reg [7:0]dout1;
-	assign dout = addr ? dout1 : {4'b0000, idx_buf};
-	 
-	always @(posedge CLK) begin
-		if(CE && WR) begin
-			if(!addr) idx_buf <= din[3:0];
-			if(addr || WORD) begin
-				store[index] <= data;
-				case(index)
-					0: setres <= data[3:0];
-					1: enable_setres <= data[3:0];
-					2: color_compare <= data[3:0];
-					3: {logop, rotate_count} <= data[4:0];
-					4: rplane <= data[1:0];
-					5: rwmode <= {data[3], data[1:0]};
-					7: color_dont_care <= data[3:0];
-					8: bitmask <= data;
-				endcase
-			end
-		end
-		dout1 <= store[idx_buf];
+ 
+	reg [7:0]crtc[3:0];
+	reg [2:0]index = 0;
+	assign dout = crtc[index[1:0]];
+	assign cursorpos = {crtc[2][3:0], crtc[3]};
+	assign scraddr = {crtc[0], crtc[1]};
+ 
+	always @(posedge CLK) if(CE && WR) begin
+		if(addr) begin
+			if(index[2]) crtc[index[1:0]] <= din;
+			else if(index[1:0] == 2'b10) oncursor <= din[5];
+		end else index <= din[2:0];
 	end
 endmodule

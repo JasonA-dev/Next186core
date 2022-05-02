@@ -204,25 +204,11 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"MyCore;;",
 	"-;",
+	"F0,ROM,Load BIOS;",
+	"-;",	
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O2,TV Mode,NTSC,PAL;",
 	"O34,Noise,White,Red,Green,Blue;",
-	"-;",
-	"P1,Test Page 1;",
-	"P1-;",
-	"P1-, -= Options in page 1 =-;",
-	"P1-;",
-	"P1O5,Option 1-1,Off,On;",
-	"d0P1F1,BIN;",
-	"H0P1O6,Option 1-2,Off,On;",
-	"-;",
-	"P2,Test Page 2;",
-	"P2-;",
-	"P2-, -= Options in page 2 =-;",
-	"P2-;",
-	"P2S0,DSK;",
-	"P2O67,Option 2,1,2,3,4;",
-	"-;",
 	"-;",
 	"T0,Reset;",
 	"R0,Reset and close OSD;",
@@ -233,6 +219,13 @@ wire forced_scandoubler;
 wire  [1:0] buttons;
 wire [31:0] status;
 wire [10:0] ps2_key;
+
+wire        ioctl_download;
+wire        ioctl_wr;
+wire [24:0] ioctl_addr;
+wire [15:0] ioctl_dout;
+wire [15:0] ioctl_index;
+wire        ioctl_wait;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -247,12 +240,20 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.status(status),
 	.status_menumask({status[5]}),
 	
+	.ioctl_download(ioctl_download),
+	.ioctl_wr(ioctl_wr),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_dout(ioctl_dout),
+	.ioctl_index(ioctl_index),
+	.ioctl_wait(ioctl_wait),
+
 	.ps2_key(ps2_key)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
+
 pll pll
 (
 	.refclk(CLK_50M),
@@ -270,36 +271,91 @@ wire HBlank;
 wire HSync;
 wire VBlank;
 wire VSync;
-wire ce_pix;
-wire [7:0] video;
+//wire ce_pix;
 
-mycore mycore
+system ddr_186
 (
-	.clk(clk_sys),
-	.reset(reset),
-	
-	.pal(status[2]),
-	.scandouble(forced_scandoubler),
+	.clk_25(clk_sys), 		// VGA i
+	.clk_sdr(clk_sys), 		// SDRAM i
 
-	.ce_pix(ce_pix),
+	.CLK44100x256(), 		// Soundwave i
+	.CLK14745600(), 		// RS232 clk i
+	.clk_50(), 				// OPL3 i
+	.clk_OPL(), 			// i
 
-	.HBlank(HBlank),
-	.HSync(HSync),
-	.VBlank(VBlank),
-	.VSync(VSync),
+	.clk_cpu(clk_sys),  	// i
+	.clk_dsp(clk_sys), 		// i
+	.cpu_speed(0), 			// CPU speed control, 0 - maximum [1:0] i
 
-	.video(video)
+	.sdr_n_CS_WE_RAS_CAS(), // [3:0] o
+	.sdr_BA(),  			// [1:0] o
+	.sdr_ADDR(),  			// [12:0] o
+	.sdr_DATA(), 			// [15:0] io
+	.sdr_DQM(), 			// [1:0] o
+
+	.VGA_R(VGA_R), 			// [5:0] o
+	.VGA_G(VGA_G), 			// [5:0] o
+	.VGA_B(VGA_B), 			// [5:0] o
+
+	.frame_on(),			// o
+
+	.VGA_HSYNC(HSync), 		// o
+	.VGA_VSYNC(VSync), 		// o
+
+	.hblnk(HBlank), // o
+	.vblnk(VBlank), // o
+
+	.BTN_RESET(reset),		// Reset i
+	.BTN_NMI(),			// NMI i
+
+	.LED(),				// HALT [7:0] o
+
+	.RS232_DCE_RXD(), 	// i
+	.RS232_DCE_TXD(), 	// o
+	.RS232_EXT_RXD(), 	// i
+	.RS232_EXT_TXD(), 	// o
+	.RS232_HOST_RXD(), 	// i
+	.RS232_HOST_TXD(), 	// o
+	.RS232_HOST_RST(), 	// o
+
+	.SD_n_CS(), 		//= 1'b1, o
+	.SD_DI(), 			// o
+	.SD_CK(), 			// = 0, o
+	.SD_DO(), 			// i
+		 
+	.AUD_L(), 			// o
+	.AUD_R(), 			// o
+
+	.PS2_CLK1_I(), 		// i
+	.PS2_CLK1_O(), 		// o
+	.PS2_CLK2_I(), 		// i
+	.PS2_CLK2_O(), 		// o
+	.PS2_DATA1_I(), 	// i
+	.PS2_DATA1_O(), 	// o
+	.PS2_DATA2_I(), 	// i
+	.PS2_DATA2_O(), 	// o
+	 
+	.GPIO(), 			// [7:0] io
+	.I2C_SCL(), 		// o
+	.I2C_SDA(), 		// io
+
+	.BIOS_ADDR(ioctl_addr),
+	.BIOS_DIN(ioctl_dout),
+	.BIOS_WR(ioctl_wr & ioctl_download & ioctl_index==0),
+	.BIOS_REQ(ioctl_wait)	
+
+	//.BIOS_ADDR(), 		//[12:0] i
+	//.BIOS_DIN(), 		// [15:0] i
+	//.BIOS_WR(), 		// i
+	//.BIOS_REQ() 		// o
 );
 
 assign CLK_VIDEO = clk_sys;
-assign CE_PIXEL = ce_pix;
+assign CE_PIXEL = 1'b1; // ce_pix;
 
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
-assign VGA_G  = (!col || col == 2) ? video : 8'd0;
-assign VGA_R  = (!col || col == 1) ? video : 8'd0;
-assign VGA_B  = (!col || col == 3) ? video : 8'd0;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 

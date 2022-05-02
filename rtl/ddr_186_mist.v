@@ -621,6 +621,7 @@ module system (
 		 .out2(timer_spk)
     );
 
+/*
 	soundwave sound_gen
 	(
 		.CLK(clk_cpu),
@@ -650,6 +651,7 @@ module system (
 		.stb44100(stb44100),
 		.reset(!rstcount[18])
 	);
+*/
 
 	reg nop;
 	reg fifo_fill = 1;
