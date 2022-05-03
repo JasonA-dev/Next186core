@@ -40,9 +40,9 @@ module emu
 	output [12:0] VIDEO_ARX,
 	output [12:0] VIDEO_ARY,
 
-	output  [7:0] VGA_R,
-	output  [7:0] VGA_G,
-	output  [7:0] VGA_B,
+	output  [5:0] VGA_R,
+	output  [5:0] VGA_G,
+	output  [5:0] VGA_B,
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
@@ -206,12 +206,14 @@ localparam CONF_STR = {
 	"-;",
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O2,TV Mode,NTSC,PAL;",
-	"O34,Noise,White,Red,Green,Blue;",
+	"O34,CPU Speed,/1,/2,/3,/4;",
 	"-;",
 	"T0,Reset;",
 	"R0,Reset and close OSD;",
 	"V,v",`BUILD_DATE 
 };
+
+wire  [1:0] cpu_speed = status[4:3];
 
 wire forced_scandoubler;
 wire  [1:0] buttons;
@@ -225,7 +227,7 @@ wire [15:0] ioctl_dout;
 wire [15:0] ioctl_index;
 wire        ioctl_wait;
 
-hps_io #(.CONF_STR(CONF_STR)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -250,24 +252,31 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
-wire clk_sys, clk_cpu, clk_sdr, clk_dsp;
-assign clk_sdr = clk_sys * 2;
-assign clk_dsp = clk_sdr;
+wire clk_25, clk_70;
+
+/*
+wire clk_sys = clk_25;
+wire clk_sdr = clk_70 * 2;
+wire clk_cpu = clk_70;
+wire clk_dsp = clk_70;
+assign SDRAM_CLK = clk_70 * 2;
+*/
+
+wire clk_sys = clk_25;
+wire clk_sdr = clk_25 * 2;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys),
-	.outclk_1(clk_cpu)	
+	.outclk_0(clk_25),
+	.outclk_1(clk_70)	
 );
 
 reg  reset;
 always @(posedge clk_sys) reset <= status[0] | buttons[1] | !bios_loaded;
 
 //////////////////////////////////////////////////////////////////
-
-wire [1:0] col = status[4:3];
 
 wire HBlank;
 wire HSync;
@@ -281,12 +290,12 @@ system ddr_186
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
-	.clk_50(), 				// OPL3 i
-	.clk_OPL(), 			// i
+	.clk_50(), 		// OPL3 i
+	.clk_OPL(), 		// i
 
 	.clk_cpu(clk_sys),  	// i
 	.clk_dsp(clk_sys), 		// i
-	.cpu_speed(0), 			// CPU speed control, 0 - maximum [1:0] i
+	.cpu_speed(cpu_speed), 	// CPU speed control, 0 - maximum [1:0] i
 
 	.sdr_n_CS_WE_RAS_CAS(), // [3:0] o
 	.sdr_BA(),  			// [1:0] o
@@ -349,7 +358,7 @@ system ddr_186
 reg [15:0] bios_tmp[64];
 reg [12:0] bios_addr = 0;
 reg [15:0] bios_din;
-reg        bios_wr = 1'b0;
+reg        bios_wr = 0;
 wire       bios_req;
 reg        bios_loaded = 0;
 
@@ -386,20 +395,43 @@ always @(posedge clk_sys) begin
 end
 */
 
-reg [12:0] bios_addrtemp = 0;
-reg [15:0] bios_dintemp;
+reg [12:0] bios_tmp_addr = 0;
+reg [7:0] bios_tmp_din;
 
 always @(posedge clk_sys) begin
-	if (bios_addr == 12'd4095) bios_loaded <= 1;
+	reg bios_reqD;
+	reg [7:0] dat;
+
+	//if (bios_addr == 13'd8191) begin
+	//	bios_loaded <= 1;
+	//	bios_wr <= 0;
+	//end
+
+	if (bios_tmp_addr[0]) begin
+		bios_tmp[bios_tmp_addr[6:1]] <= {bios_tmp_din, dat};
+		if (&bios_tmp_addr[5:1]) bios_wr <= 1;
+	end else begin
+		dat <= bios_tmp_din;
+	end
+
+	bios_reqD <= bios_req;
+	if (bios_reqD & ~bios_req) bios_wr <= 0;
+	else bios_wr <= 1;
+
+	if (bios_req) begin
+		bios_addr <= bios_addr + 1'd1;
+		bios_din <= bios_tmp[bios_addr[5:0]];
+	end
 end
 
-rom #(.DW(16), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
+rom #(.DW(8), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
 	.clock  	(clk_sys	),
 	.ce     	(bios_req	),
-	.data_out   (bios_din	),
-	.out_address(bios_addr  )
+	.data_out   (bios_tmp_din	),
+	.out_address(bios_tmp_addr  )
 );
+
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL = 1'b1;
