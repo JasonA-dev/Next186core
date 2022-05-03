@@ -277,7 +277,7 @@ wire VSync;
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sdr), 		// SDRAM i
+	.clk_sdr(clk_sys), 		// SDRAM i
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
@@ -389,13 +389,13 @@ end
 reg [12:0] bios_addrtemp = 0;
 reg [15:0] bios_dintemp;
 
-always @(posedge clk_sdr) begin
+always @(posedge clk_sys) begin
 	if (bios_addr == 12'd4095) bios_loaded <= 1;
 end
 
 rom #(.DW(16), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
-	.clock  	(clk_sdr	),
+	.clock  	(clk_sys	),
 	.ce     	(bios_req	),
 	.data_out   (bios_din	),
 	.out_address(bios_addr  )
