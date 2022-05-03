@@ -204,8 +204,6 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"MyCore;;",
 	"-;",
-	"F0,ROM,Load BIOS;",
-	"-;",	
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O2,TV Mode,NTSC,PAL;",
 	"O34,Noise,White,Red,Green,Blue;",
@@ -252,16 +250,21 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
-wire clk_sys;
+wire clk_sys, clk_cpu, clk_sdr, clk_dsp;
+assign clk_sdr = clk_cpu * 2;
+assign clk_dsp = clk_sdr;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys)
+	.outclk_0(clk_sys),
+	.outclk_1(clk_cpu)	
 );
 
-wire reset = RESET | status[0] | buttons[1];
+//wire reset = RESET | status[0] | buttons[1];
+reg  reset;
+always @(posedge clk_cpu) reset <= status[0] | buttons[1] | !bios_loaded;
 
 //////////////////////////////////////////////////////////////////
 
@@ -276,15 +279,15 @@ wire VSync;
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sys), 		// SDRAM i
+	.clk_sdr(clk_sdr), 		// SDRAM i
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
-	.clk_50(), 				// OPL3 i
-	.clk_OPL(), 			// i
+	.clk_50(CLK_50M), 		// OPL3 i
+	.clk_OPL(CLK_50M), 			// i
 
-	.clk_cpu(clk_sys),  	// i
-	.clk_dsp(clk_sys), 		// i
+	.clk_cpu(clk_cpu),  	// i
+	.clk_dsp(clk_dsp), 		// i
 	.cpu_speed(0), 			// CPU speed control, 0 - maximum [1:0] i
 
 	.sdr_n_CS_WE_RAS_CAS(), // [3:0] o
@@ -339,15 +342,59 @@ system ddr_186
 	.I2C_SCL(), 		// o
 	.I2C_SDA(), 		// io
 
-	.BIOS_ADDR(ioctl_addr),
-	.BIOS_DIN(ioctl_dout),
-	.BIOS_WR(ioctl_wr & ioctl_download & ioctl_index==0),
-	.BIOS_REQ(ioctl_wait)	
+	.BIOS_ADDR(bios_addr), 		// [12:0] i
+	.BIOS_DIN(bios_din), 		// [15:0] i
+	.BIOS_WR(bios_wr), 			// i
+	.BIOS_REQ(bios_req) 		// o
+);
 
-	//.BIOS_ADDR(), 		//[12:0] i
-	//.BIOS_DIN(), 		// [15:0] i
-	//.BIOS_WR(), 		// i
-	//.BIOS_REQ() 		// o
+reg [15:0] bios_tmp[64];
+reg [12:0] bios_addr = 0;
+reg [15:0] bios_din;
+reg        bios_wr = 1'b1;
+wire       bios_req;
+reg        bios_loaded = 0;
+
+/*
+always @(posedge clk_sys) begin
+	reg [7:0] dat;
+	reg       bios_reqD;
+	reg       ioctl_downlD;
+
+	ioctl_downlD <= ioctl_download;
+	if (ioctl_download & ~ioctl_downlD) begin
+		bios_addr <= 0;
+		bios_wr <= 0;
+	end
+
+	if (ioctl_downlD & ~ioctl_download) bios_loaded <= 1;
+
+	if (ioctl_download & ioctl_wr) begin
+		if (ioctl_addr[0]) begin
+			bios_tmp[ioctl_addr[6:1]] <= {ioctl_dout, dat};
+			if (&ioctl_addr[5:1]) bios_wr <= 1;
+		end else begin
+			dat <= ioctl_dout;
+		end
+	end
+
+	bios_reqD <= bios_req;
+	if (bios_reqD & ~bios_req) bios_wr <= 0;
+
+	if (ioctl_download & bios_req) begin
+		bios_addr <= bios_addr + 1'd1;
+		bios_din <= bios_tmp[bios_addr[5:0]];
+	end
+end
+*/
+
+rom #(.DW(16), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
+(
+	.clock  	(clk_sdr 	),
+	.ce     	(bios_req	), //1'b1, bios_req
+	.data_out   (bios_din	),
+	.a      	(addr  		),
+	.out_address(bios_addr  )
 );
 
 assign CLK_VIDEO = clk_sys;
