@@ -251,7 +251,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys, clk_cpu, clk_sdr, clk_dsp;
-assign clk_sdr = clk_cpu * 2;
+assign clk_sdr = clk_sys * 2;
 assign clk_dsp = clk_sdr;
 
 pll pll
@@ -262,9 +262,8 @@ pll pll
 	.outclk_1(clk_cpu)	
 );
 
-//wire reset = RESET | status[0] | buttons[1];
 reg  reset;
-always @(posedge clk_cpu) reset <= status[0] | buttons[1] | !bios_loaded;
+always @(posedge clk_sys) reset <= status[0] | buttons[1] | !bios_loaded;
 
 //////////////////////////////////////////////////////////////////
 
@@ -274,7 +273,6 @@ wire HBlank;
 wire HSync;
 wire VBlank;
 wire VSync;
-//wire ce_pix;
 
 system ddr_186
 (
@@ -283,11 +281,11 @@ system ddr_186
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
-	.clk_50(CLK_50M), 		// OPL3 i
-	.clk_OPL(CLK_50M), 			// i
+	.clk_50(), 				// OPL3 i
+	.clk_OPL(), 			// i
 
-	.clk_cpu(clk_cpu),  	// i
-	.clk_dsp(clk_dsp), 		// i
+	.clk_cpu(clk_sys),  	// i
+	.clk_dsp(clk_sys), 		// i
 	.cpu_speed(0), 			// CPU speed control, 0 - maximum [1:0] i
 
 	.sdr_n_CS_WE_RAS_CAS(), // [3:0] o
@@ -351,7 +349,7 @@ system ddr_186
 reg [15:0] bios_tmp[64];
 reg [12:0] bios_addr = 0;
 reg [15:0] bios_din;
-reg        bios_wr = 1'b1;
+reg        bios_wr = 1'b0;
 wire       bios_req;
 reg        bios_loaded = 0;
 
@@ -388,17 +386,23 @@ always @(posedge clk_sys) begin
 end
 */
 
+reg [12:0] bios_addrtemp = 0;
+reg [15:0] bios_dintemp;
+
+always @(posedge clk_sdr) begin
+	if (bios_addr == 12'd4095) bios_loaded <= 1;
+end
+
 rom #(.DW(16), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
-	.clock  	(clk_sdr 	),
-	.ce     	(bios_req	), //1'b1, bios_req
+	.clock  	(clk_sdr	),
+	.ce     	(bios_req	),
 	.data_out   (bios_din	),
-	.a      	(addr  		),
 	.out_address(bios_addr  )
 );
 
 assign CLK_VIDEO = clk_sys;
-assign CE_PIXEL = 1'b1; // ce_pix;
+assign CE_PIXEL = 1'b1;
 
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;

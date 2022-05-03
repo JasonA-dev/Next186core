@@ -8,12 +8,11 @@ module rom
 	parameter FN = ""
 )
 (
-	input  wire         clock,
-	input  wire         ce,
-	output reg [DW-1:0] data_out,
-	input  wire[AW-1:0] a,
+	input  wire          clock,
+	input  wire          ce,
 
-	output  reg[AW-1:0] out_address
+	output reg  [DW-1:0] data_out,
+	output reg  [AW-1:0] out_address
 );
 //-------------------------------------------------------------------------------------------------
 

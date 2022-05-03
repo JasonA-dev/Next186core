@@ -676,8 +676,8 @@ module system (
 		max_read <= &sdraddr[7:3] ? ~sdraddr[2:0] : 3'b111; // SDRAM row size = 512 words
 
 		BIOS_data_valid <= BIOS_WR;
-		//BIOS_data <= BIOS_DIN;
-		BIOS_data <= {BIOS_DIN[7:0],BIOS_DIN[15:8]};
+		BIOS_data <= BIOS_DIN;
+		//BIOS_data <= {BIOS_DIN[7:0],BIOS_DIN[15:8]};
 
 		if(BIOS_WR) cntrl0_user_command_register <= 2'b01;
 		else if(s_prog_empty && fifo_fill) cntrl0_user_command_register <= 2'b10;	// read 32 bytes VGA
