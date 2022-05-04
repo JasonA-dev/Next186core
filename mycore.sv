@@ -355,7 +355,7 @@ system ddr_186
 	.BIOS_REQ(bios_req) 		// o
 );
 
-reg [15:0] bios_tmp[64];
+reg [15:0] bios_tmp;
 reg [12:0] bios_addr = 0;
 reg [15:0] bios_din;
 reg        bios_wr = 0;
@@ -402,14 +402,14 @@ always @(posedge clk_sys) begin
 	reg bios_reqD;
 	reg [7:0] dat;
 
-	//if (bios_addr == 13'd8191) begin
-	//	bios_loaded <= 1;
-	//	bios_wr <= 0;
-	//end
+	if (bios_tmp_addr == 13'd8191) begin
+		bios_loaded <= 1;
+		bios_wr <= 0;
+	end
 
-	if (bios_tmp_addr[0]) begin
-		bios_tmp[bios_tmp_addr[6:1]] <= {bios_tmp_din, dat};
-		if (&bios_tmp_addr[5:1]) bios_wr <= 1;
+	if (~bios_tmp_addr[0] && bios_tmp_addr > 0) begin
+		bios_tmp <= {dat, bios_tmp_din};
+		bios_wr <= 1;
 	end else begin
 		dat <= bios_tmp_din;
 	end
@@ -418,9 +418,9 @@ always @(posedge clk_sys) begin
 	if (bios_reqD & ~bios_req) bios_wr <= 0;
 	else bios_wr <= 1;
 
-	if (bios_req) begin
+	if (bios_req && bios_wr) begin
 		bios_addr <= bios_addr + 1'd1;
-		bios_din <= bios_tmp[bios_addr[5:0]];
+		bios_din <= bios_tmp;
 	end
 end
 
