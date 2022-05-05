@@ -286,7 +286,7 @@ wire VSync;
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sys), 		// SDRAM i
+	.clk_sdr(clk_sdr), 		// SDRAM i
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
@@ -398,7 +398,7 @@ end
 reg [12:0] bios_tmp_addr = 0;
 reg [7:0] bios_tmp_din;
 
-always @(posedge clk_sys) begin
+always @(posedge clk_sdr) begin
 	reg bios_reqD;
 	reg [7:0] dat;
 
@@ -406,32 +406,32 @@ always @(posedge clk_sys) begin
 		bios_loaded <= 1;
 		bios_wr <= 0;
 	end
+	else begin
+		if (~bios_tmp_addr[0] && bios_tmp_addr > 0) begin
+			bios_tmp <= {dat, bios_tmp_din};
+			bios_wr <= 1;
+		end else begin
+			dat <= bios_tmp_din;
+		end
 
-	if (~bios_tmp_addr[0] && bios_tmp_addr > 0) begin
-		bios_tmp <= {dat, bios_tmp_din};
-		bios_wr <= 1;
-	end else begin
-		dat <= bios_tmp_din;
-	end
+		bios_reqD <= bios_req;
+		if (bios_reqD & ~bios_req) bios_wr <= 0;
+		else bios_wr <= 1;
 
-	bios_reqD <= bios_req;
-	if (bios_reqD & ~bios_req) bios_wr <= 0;
-	else bios_wr <= 1;
-
-	if (bios_req && bios_wr) begin
-		bios_addr <= bios_addr + 1'd1;
-		bios_din <= bios_tmp;
+		if (bios_req && bios_wr) begin
+			bios_addr <= bios_addr + 1'd1;
+			bios_din <= bios_tmp;
+		end
 	end
 end
 
 rom #(.DW(8), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
-	.clock  	(clk_sys	),
+	.clock  	(clk_sdr	),
 	.ce     	(bios_req	),
 	.data_out   (bios_tmp_din	),
 	.out_address(bios_tmp_addr  )
 );
-
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL = 1'b1;
