@@ -286,7 +286,7 @@ wire VSync;
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sys), 		// SDRAM i
+	.clk_sdr(clk_sdr), 		// SDRAM i
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
