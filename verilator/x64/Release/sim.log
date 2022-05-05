@@ -1,0 +1,31 @@
+﻿  imgui_widgets.cpp
+  imgui_tables.cpp
+  imgui_impl_win32.cpp
+  imgui_impl_dx11.cpp
+  imgui_draw.cpp
+  imgui.cpp
+  ImGuiFileDialog.cpp
+  implot.cpp
+  implot_items.cpp
+  verilated.cpp
+  verilated_save.cpp
+  verilated_vcd_c.cpp
+  Vtop.cpp
+  Vtop__Syms.cpp
+  Vtop__Slow.cpp
+  Vtop__Trace.cpp
+  Vtop__Trace__Slow.cpp
+  sim_clock.cpp
+  sim_bus.cpp
+  sim_console.cpp
+  Generating Code...
+  Compiling...
+  sim_input.cpp
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um\dinput.h: DIRECTINPUT_VERSION undefined. Defaulting to version 0x0800
+  sim_video.cpp
+  sim_audio.cpp
+  sim_main.cpp
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um\dinput.h: DIRECTINPUT_VERSION undefined. Defaulting to version 0x0800
+  Generating Code...
+     Creating library C:\NoSync\MiSTer\MyCores\Next186core\verilator\x64\Release\sim.lib and object C:\NoSync\MiSTer\MyCores\Next186core\verilator\x64\Release\sim.exp
+  sim.vcxproj -> C:\NoSync\MiSTer\MyCores\Next186core\verilator\x64\Release\sim.exe

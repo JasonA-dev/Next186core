@@ -290,8 +290,8 @@ system ddr_186
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
-	.clk_50(), 		// OPL3 i
-	.clk_OPL(), 		// i
+	.clk_50(), 				// OPL3 i
+	.clk_OPL(), 			// i
 
 	.clk_cpu(clk_sys),  	// i
 	.clk_dsp(clk_sys), 		// i
@@ -312,11 +312,11 @@ system ddr_186
 	.VGA_HSYNC(HSync), 		// o
 	.VGA_VSYNC(VSync), 		// o
 
-	.hblnk(HBlank), // o
-	.vblnk(VBlank), // o
+	.hblnk(HBlank), 		// o
+	.vblnk(VBlank), 		// o
 
 	.BTN_RESET(reset),		// Reset i
-	.BTN_NMI(),			// NMI i
+	.BTN_NMI(),				// NMI i
 
 	.LED(),				// HALT [7:0] o
 
@@ -328,9 +328,9 @@ system ddr_186
 	.RS232_HOST_TXD(), 	// o
 	.RS232_HOST_RST(), 	// o
 
-	.SD_n_CS(), 		//= 1'b1, o
+	.SD_n_CS(), 		// 1'b1, o
 	.SD_DI(), 			// o
-	.SD_CK(), 			// = 0, o
+	.SD_CK(), 			// 0, o
 	.SD_DO(), 			// i
 		 
 	.AUD_L(), 			// o
@@ -360,7 +360,7 @@ reg [12:0] bios_addr = 0;
 reg [15:0] bios_din;
 reg        bios_wr = 0;
 wire       bios_req;
-reg        bios_loaded = 0;
+reg        bios_loaded;
 
 /*
 always @(posedge clk_sys) begin
@@ -395,43 +395,67 @@ always @(posedge clk_sys) begin
 end
 */
 
-reg [12:0] bios_tmp_addr = 0;
-reg [7:0] bios_tmp_din;
+reg [13:0] bios_addr_counter = 0;
+reg [13:0] bios_load_addr;
+reg [7:0]  bios_tmp_din;
 
 always @(posedge clk_sys) begin
-	reg bios_reqD;
-	reg [7:0] dat;
+   	reg [7:0]   dat;
+   	reg         dat_set;
 
-	if (bios_tmp_addr == 13'd8191) begin
+    // 0. if address is over 8191, then return that bios is Loaded
+	if (bios_addr_counter >= 14'd8192) begin
 		bios_loaded <= 1;
 		bios_wr <= 0;
 	end
+	else begin
+      	// 1. check if there is a bios request in 
+      	if (bios_req) begin
+         	// 2. check if bios is ready, and send the request
+         	if(dat_set) begin
+				bios_load_addr <= bios_load_addr + 1'd1;
 
-	if (~bios_tmp_addr[0] && bios_tmp_addr > 0) begin
-		bios_tmp <= {dat, bios_tmp_din};
-		bios_wr <= 1;
-	end else begin
-		dat <= bios_tmp_din;
-	end
+				bios_tmp[15:8] <= bios_tmp_din;
+				bios_tmp[7:0] <= dat;
+				//bios_tmp[15:8] <= dat;
+				//bios_tmp[7:0] <= bios_tmp_din;
 
-	bios_reqD <= bios_req;
-	if (bios_reqD & ~bios_req) bios_wr <= 0;
-	else bios_wr <= 1;
-
-	if (bios_req && bios_wr) begin
-		bios_addr <= bios_addr + 1'd1;
-		bios_din <= bios_tmp;
-	end
+            	bios_addr_counter <= bios_addr_counter + 1'd1;
+            	dat_set <= 1'b0;
+            	if (bios_load_addr > 1) begin
+			    	bios_addr <= bios_load_addr[12:0] - 1;      
+					bios_din <= bios_tmp;
+	   	      		bios_wr <= 1;
+                	//$display("dat_set %x bios_addr %x bios_tmp %x bios_tmp_din %x bios_load_addr %x dat %x", dat_set, bios_addr, bios_tmp, bios_tmp_din, bios_load_addr, dat);
+            	end
+         	end
+        	else begin
+        	// 3. if not, then create the bios data_out
+        		dat <= bios_tmp_din;
+            	dat_set <= 1'b1;
+		    	bios_wr <= 0;
+        	end
+      	end
+   	end
 end
 
-rom #(.DW(8), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
+rom #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
-	.clock  	(clk_sys	),
-	.ce     	(bios_req	),
-	.data_out   (bios_tmp_din	),
-	.out_address(bios_tmp_addr  )
+	.clock  	(clk_sys	    ),
+	.ce     	(bios_req	    ),
+    .in_address (bios_load_addr ),
+	.data_out   (bios_tmp_din	)
 );
 
+/*
+rommif #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.mif")) BIOS
+(
+	.clock  	(clk_sdr	    ),
+	.ce     	(bios_req	    ),
+    .in_address (bios_load_addr ),
+	.data_out   (bios_tmp_din	)
+);
+*/
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL = 1'b1;

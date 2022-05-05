@@ -8,11 +8,11 @@ module rom
 	parameter FN = ""
 )
 (
-	input  wire          clock,
-	input  wire          ce,
+	input  wire            clock,
+	input  wire            ce,
+	input  wire  [AW-1:0]  in_address,
 
-	output reg  [DW-1:0] data_out,
-	output reg  [AW-1:0] out_address
+	output reg   [DW-1:0]  data_out
 );
 //-------------------------------------------------------------------------------------------------
 
@@ -20,11 +20,7 @@ reg[DW-1:0] d[(2**AW)-1:0];
 initial $readmemh(FN, d, 0);
 
 always @(posedge clock) begin
-	if(ce) 
-	begin
-		out_address <= out_address + 1'd1;		
-		data_out <= d[out_address];		
-	end
+	data_out <= d[in_address];	
 end
 
 //-------------------------------------------------------------------------------------------------
