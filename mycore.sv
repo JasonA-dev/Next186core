@@ -185,8 +185,6 @@ assign VGA_SCALER = 0;
 assign HDMI_FREEZE = 0;
 
 assign AUDIO_S = 0;
-assign AUDIO_L = 0;
-assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
 assign LED_DISK = 0;
@@ -262,6 +260,8 @@ wire clk_dsp = clk_70;
 assign SDRAM_CLK = clk_70 * 2;
 */
 
+assign SDRAM_CLK = clk_sdr;
+
 wire clk_sys = clk_25;
 wire clk_sdr = clk_25 * 2;
 
@@ -297,11 +297,11 @@ system ddr_186
 	.clk_dsp(clk_sys), 		// i
 	.cpu_speed(cpu_speed), 	// CPU speed control, 0 - maximum [1:0] i
 
-	.sdr_n_CS_WE_RAS_CAS(), // [3:0] o
-	.sdr_BA(),  			// [1:0] o
-	.sdr_ADDR(),  			// [12:0] o
-	.sdr_DATA(), 			// [15:0] io
-	.sdr_DQM(), 			// [1:0] o
+	.sdr_n_CS_WE_RAS_CAS({SDRAM_nCS, SDRAM_nWE, SDRAM_nRAS, SDRAM_nCAS}), // [3:0] o
+	.sdr_BA(SDRAM_BA),  	// [1:0] o
+	.sdr_ADDR(SDRAM_A),  	// [12:0] o
+	.sdr_DATA(SDRAM_DQ), 	// [15:0] io
+	.sdr_DQM({SDRAM_DQMH, SDRAM_DQML}), // [1:0] o
 
 	.VGA_R(VGA_R), 			// [5:0] o
 	.VGA_G(VGA_G), 			// [5:0] o
@@ -318,41 +318,41 @@ system ddr_186
 	.BTN_RESET(reset),		// Reset i
 	.BTN_NMI(),				// NMI i
 
-	.LED(),				// HALT [7:0] o
+	.LED(),					// HALT [7:0] o
 
-	.RS232_DCE_RXD(), 	// i
-	.RS232_DCE_TXD(), 	// o
-	.RS232_EXT_RXD(), 	// i
-	.RS232_EXT_TXD(), 	// o
-	.RS232_HOST_RXD(), 	// i
-	.RS232_HOST_TXD(), 	// o
-	.RS232_HOST_RST(), 	// o
+	.RS232_DCE_RXD(), 		// i
+	.RS232_DCE_TXD(), 		// o
+	.RS232_EXT_RXD(), 		// i
+	.RS232_EXT_TXD(), 		// o
+	.RS232_HOST_RXD(), 		// i
+	.RS232_HOST_TXD(), 		// o
+	.RS232_HOST_RST(), 		// o
 
-	.SD_n_CS(), 		// 1'b1, o
-	.SD_DI(), 			// o
-	.SD_CK(), 			// 0, o
-	.SD_DO(), 			// i
+	.SD_n_CS(SD_CS), 		// 1'b1, o
+	.SD_DI(SD_MOSI), 		// o
+	.SD_CK(SD_SCK), 		// 0, o
+	.SD_DO(SD_MISO), 		// i
 		 
-	.AUD_L(), 			// o
-	.AUD_R(), 			// o
+	.AUD_L(AUDIO_L), 		// o
+	.AUD_R(AUDIO_R), 		// o
 
-	.PS2_CLK1_I(), 		// i
-	.PS2_CLK1_O(), 		// o
-	.PS2_CLK2_I(), 		// i
-	.PS2_CLK2_O(), 		// o
-	.PS2_DATA1_I(), 	// i
-	.PS2_DATA1_O(), 	// o
-	.PS2_DATA2_I(), 	// i
-	.PS2_DATA2_O(), 	// o
+	.PS2_CLK1_I(), 			// i
+	.PS2_CLK1_O(), 			// o
+	.PS2_CLK2_I(), 			// i
+	.PS2_CLK2_O(), 			// o
+	.PS2_DATA1_I(), 		// i
+	.PS2_DATA1_O(), 		// o
+	.PS2_DATA2_I(), 		// i
+	.PS2_DATA2_O(), 		// o
 	 
-	.GPIO(), 			// [7:0] io
-	.I2C_SCL(), 		// o
-	.I2C_SDA(), 		// io
+	.GPIO(), 				// [7:0] io
+	.I2C_SCL(), 			// o
+	.I2C_SDA(), 			// io
 
-	.BIOS_ADDR(bios_addr), 		// [12:0] i
-	.BIOS_DIN(bios_din), 		// [15:0] i
-	.BIOS_WR(bios_wr), 			// i
-	.BIOS_REQ(bios_req) 		// o
+	.BIOS_ADDR(bios_addr), 	// [12:0] i
+	.BIOS_DIN(bios_din), 	// [15:0] i
+	.BIOS_WR(bios_wr), 		// i
+	.BIOS_REQ(bios_req) 	// o
 );
 
 reg [15:0] bios_tmp;
@@ -399,7 +399,7 @@ reg [13:0] bios_addr_counter = 0;
 reg [13:0] bios_load_addr;
 reg [7:0]  bios_tmp_din;
 
-always @(posedge clk_sys) begin
+always @(posedge clk_sdr) begin
    	reg [7:0]   dat;
    	reg         dat_set;
 
@@ -415,10 +415,9 @@ always @(posedge clk_sys) begin
          	if(dat_set) begin
 				bios_load_addr <= bios_load_addr + 1'd1;
 
+				// Intel order correct LB+HB
 				bios_tmp[15:8] <= bios_tmp_din;
 				bios_tmp[7:0] <= dat;
-				//bios_tmp[15:8] <= dat;
-				//bios_tmp[7:0] <= bios_tmp_din;
 
             	bios_addr_counter <= bios_addr_counter + 1'd1;
             	dat_set <= 1'b0;
@@ -441,7 +440,7 @@ end
 
 rom #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
-	.clock  	(clk_sys	    ),
+	.clock  	(clk_sdr	    ),
 	.ce     	(bios_req	    ),
     .in_address (bios_load_addr ),
 	.data_out   (bios_tmp_din	)
@@ -463,6 +462,7 @@ assign CE_PIXEL = 1'b1;
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
+
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
