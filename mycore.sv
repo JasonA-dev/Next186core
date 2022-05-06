@@ -216,7 +216,16 @@ wire  [1:0] cpu_speed = status[4:3];
 wire forced_scandoubler;
 wire  [1:0] buttons;
 wire [31:0] status;
-wire [10:0] ps2_key;
+
+wire ps2_kbd_clk_out;
+wire ps2_kbd_data_out;
+wire ps2_kbd_clk_in;
+wire ps2_kbd_data_in;
+
+wire ps2_mouse_clk_out;
+wire ps2_mouse_data_out;
+wire ps2_mouse_clk_in;
+wire ps2_mouse_data_in;
 
 wire        ioctl_download;
 wire        ioctl_wr;
@@ -245,7 +254,15 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.ioctl_index(ioctl_index),
 	.ioctl_wait(ioctl_wait),
 
-	.ps2_key(ps2_key)
+	.ps2_kbd_clk_out(ps2_kbd_clk_out),
+	.ps2_kbd_data_out(ps2_kbd_data_out),
+	.ps2_kbd_clk_in(ps2_kbd_clk_in),
+	.ps2_kbd_data_in(ps2_kbd_data_in),
+
+	.ps2_mouse_clk_out(ps2_mouse_clk_out),
+	.ps2_mouse_data_out(ps2_mouse_data_out),
+	.ps2_mouse_clk_in(ps2_mouse_clk_in),
+	.ps2_mouse_data_in(ps2_mouse_data_in)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -260,7 +277,7 @@ wire clk_dsp = clk_70;
 assign SDRAM_CLK = clk_70 * 2;
 */
 
-assign SDRAM_CLK = clk_sdr;
+assign SDRAM_CLK = clk_sys;
 
 wire clk_sys = clk_25;
 wire clk_sdr = clk_25 * 2;
@@ -286,7 +303,7 @@ wire VSync;
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sdr), 		// SDRAM i
+	.clk_sdr(clk_sys), 		// SDRAM i
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
@@ -316,7 +333,7 @@ system ddr_186
 	.vblnk(VBlank), 		// o
 
 	.BTN_RESET(reset),		// Reset i
-	.BTN_NMI(),				// NMI i
+	.BTN_NMI(1'b0),			// NMI i
 
 	.LED(),					// HALT [7:0] o
 
@@ -336,15 +353,15 @@ system ddr_186
 	.AUD_L(AUDIO_L), 		// o
 	.AUD_R(AUDIO_R), 		// o
 
-	.PS2_CLK1_I(), 			// i
-	.PS2_CLK1_O(), 			// o
-	.PS2_CLK2_I(), 			// i
-	.PS2_CLK2_O(), 			// o
-	.PS2_DATA1_I(), 		// i
-	.PS2_DATA1_O(), 		// o
-	.PS2_DATA2_I(), 		// i
-	.PS2_DATA2_O(), 		// o
-	 
+	.PS2_CLK1_I(ps2_kbd_clk_in), 		// i
+	.PS2_CLK1_O(ps2_kbd_clk_out), 		// o
+	.PS2_CLK2_I(ps2_mouse_clk_in), 		// i
+	.PS2_CLK2_O(ps2_mouse_clk_out), 	// o
+	.PS2_DATA1_I(ps2_kbd_data_in), 		// i
+	.PS2_DATA1_O(ps2_kbd_data_out), 	// o
+	.PS2_DATA2_I(ps2_mouse_data_in), 	// i
+	.PS2_DATA2_O(ps2_mouse_data_out), 	// o
+
 	.GPIO(), 				// [7:0] io
 	.I2C_SCL(), 			// o
 	.I2C_SDA(), 			// io
@@ -399,7 +416,7 @@ reg [13:0] bios_addr_counter = 0;
 reg [13:0] bios_load_addr;
 reg [7:0]  bios_tmp_din;
 
-always @(posedge clk_sdr) begin
+always @(posedge clk_sys) begin
    	reg [7:0]   dat;
    	reg         dat_set;
 
@@ -440,7 +457,7 @@ end
 
 rom #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
-	.clock  	(clk_sdr	    ),
+	.clock  	(clk_sys	    ),
 	.ce     	(bios_req	    ),
     .in_address (bios_load_addr ),
 	.data_out   (bios_tmp_din	)
@@ -462,7 +479,6 @@ assign CE_PIXEL = 1'b1;
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
-
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
