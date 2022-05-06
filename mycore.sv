@@ -230,11 +230,11 @@ wire ps2_mouse_data_in;
 wire        ioctl_download;
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
-wire [15:0] ioctl_dout;
-wire [15:0] ioctl_index;
+wire [7:0]  ioctl_dout;
+wire [7:0]  ioctl_index;
 wire        ioctl_wait;
 
-hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -379,7 +379,7 @@ reg        bios_wr = 0;
 wire       bios_req;
 reg        bios_loaded;
 
-/*
+
 always @(posedge clk_sys) begin
 	reg [7:0] dat;
 	reg       bios_reqD;
@@ -410,8 +410,8 @@ always @(posedge clk_sys) begin
 		bios_din <= bios_tmp[bios_addr[5:0]];
 	end
 end
-*/
 
+/*
 reg [13:0] bios_addr_counter = 0;
 reg [13:0] bios_load_addr;
 reg [7:0]  bios_tmp_din;
@@ -462,6 +462,7 @@ rom #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.hex")) BIOS
     .in_address (bios_load_addr ),
 	.data_out   (bios_tmp_din	)
 );
+*/
 
 /*
 rommif #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.mif")) BIOS
