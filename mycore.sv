@@ -241,7 +241,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.EXT_BUS(),
 	.gamma_bus(),
 
-	.forced_scandoubler(forced_scandoubler),
+	//.forced_scandoubler(forced_scandoubler),
 
 	.buttons(buttons),
 	.status(status),
@@ -274,13 +274,13 @@ wire clk_sys = clk_25;
 wire clk_sdr = clk_70 * 2;
 wire clk_cpu = clk_70;
 wire clk_dsp = clk_70;
-assign SDRAM_CLK = clk_70 * 2;
+//assign SDRAM_CLK = clk_70 * 2;
+
+//assign SDRAM_CLK = clk_sys;
 */
 
-assign SDRAM_CLK = clk_sys;
-
 wire clk_sys = clk_25;
-wire clk_sdr = clk_25 * 2;
+wire clk_sdr = CLK_50M;
 
 pll pll
 (
@@ -307,7 +307,7 @@ system ddr_186
 
 	.CLK44100x256(), 		// Soundwave i
 	.CLK14745600(), 		// RS232 clk i
-	.clk_50(), 				// OPL3 i
+	.clk_50(CLK_50M), 				// OPL3 i
 	.clk_OPL(), 			// i
 
 	.clk_cpu(clk_sys),  	// i
@@ -377,8 +377,7 @@ reg [12:0] bios_addr = 0;
 reg [15:0] bios_din;
 reg        bios_wr = 0;
 wire       bios_req;
-reg        bios_loaded;
-
+reg        bios_loaded = 0;
 
 always @(posedge clk_sys) begin
 	reg [7:0] dat;
@@ -395,8 +394,10 @@ always @(posedge clk_sys) begin
 
 	if (ioctl_download & ioctl_wr) begin
 		if (ioctl_addr[0]) begin
-			bios_tmp[ioctl_addr[6:1]] <= {ioctl_dout, dat};
-			if (&ioctl_addr[5:1]) bios_wr <= 1;
+			//bios_tmp[ioctl_addr[6:1]] <= {ioctl_dout, dat};			
+			bios_tmp <= {ioctl_dout, dat};
+			//if (&ioctl_addr[5:1]) 
+				bios_wr <= 1;
 		end else begin
 			dat <= ioctl_dout;
 		end
@@ -407,7 +408,7 @@ always @(posedge clk_sys) begin
 
 	if (ioctl_download & bios_req) begin
 		bios_addr <= bios_addr + 1'd1;
-		bios_din <= bios_tmp[bios_addr[5:0]];
+		bios_din <= bios_tmp; //[bios_addr[5:0]];
 	end
 end
 
@@ -471,6 +472,26 @@ rommif #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.mif")) BIOS
 	.ce     	(bios_req	    ),
     .in_address (bios_load_addr ),
 	.data_out   (bios_tmp_din	)
+);
+*/
+
+/*
+video video
+(
+	.clk(),
+	.reset(),
+	
+	.pal(),
+	.scandouble(),
+
+	.ce_pix(),
+
+	.HBlank(),
+	.HSync(),
+	.VBlank(),
+	.VSync(),
+
+	.video()
 );
 */
 
