@@ -272,7 +272,7 @@ wire clk_cpu = clk_50;
 wire clk_dsp = clk_50;
 wire pll_locked;
 
-assign SDRAM_CLK = clk_sdr;
+//assign SDRAM_CLK = clk_sdr;
 
 pll pll
 (
@@ -380,6 +380,7 @@ reg        bios_wr = 0;
 wire       bios_req;
 reg        bios_loaded = 0;
 
+/*
 always @(posedge clk_sdr) begin
 	reg [7:0] dat;
 	reg       bios_reqD;
@@ -412,10 +413,10 @@ always @(posedge clk_sdr) begin
 		bios_din <= bios_tmp[bios_addr[5:0]];
 	end
 end
+*/
 
-/*
-reg [13:0] bios_addr_counter = 0;
-reg [13:0] bios_load_addr;
+reg [12:0] bios_addr_counter = 0;
+reg [12:0] bios_load_addr;
 reg [7:0]  bios_tmp_din;
 
 always @(posedge clk_sys) begin
@@ -423,7 +424,7 @@ always @(posedge clk_sys) begin
    	reg         dat_set;
 
     // 0. if address is over 8191, then return that bios is Loaded
-	if (bios_addr_counter >= 14'd8192) begin
+	if (bios_addr_counter > 13'd8191) begin
 		bios_loaded <= 1;
 		bios_wr <= 0;
 	end
@@ -457,6 +458,7 @@ always @(posedge clk_sys) begin
    	end
 end
 
+/*
 rom #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
 	.clock  	(clk_sys	    ),
