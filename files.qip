@@ -11,16 +11,29 @@ set_global_assignment -name VERILOG_FILE rtl/timer8253.v
 set_global_assignment -name VERILOG_FILE rtl/vga.v
 set_global_assignment -name VERILOG_FILE rtl/unit186.v
 set_global_assignment -name VERILOG_FILE rtl/ddr_186.v
-set_global_assignment -name VERILOG_FILE rtl/rom.v
-set_global_assignment -name VERILOG_FILE rtl/rommif.v
+#set_global_assignment -name VERILOG_FILE rtl/rom.v
+#set_global_assignment -name VERILOG_FILE rtl/rommif.v
 
 set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_ALU.v
 set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_BIU_2T_delayread.v
 set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_CPU.v
 set_global_assignment -name VERILOG_FILE rtl/Next186/Next186_Regs.v
 
+set_global_assignment -name VERILOG_FILE rtl/NextZ80/NextZ80ALU.v
+set_global_assignment -name VERILOG_FILE rtl/NextZ80/NextZ80CPU.v
+set_global_assignment -name VERILOG_FILE rtl/NextZ80/NextZ80Reg.v
+
 set_global_assignment -name VERILOG_FILE rtl/ipcore/cache.v
 set_global_assignment -name VERILOG_FILE rtl/ipcore/sr_font.v
 set_global_assignment -name VERILOG_FILE rtl/ipcore/sdram.v
 set_global_assignment -name VERILOG_FILE rtl/ipcore/fifo.v
 set_global_assignment -name VERILOG_FILE rtl/ipcore/DAC_SRAM.v
+
+set_global_assignment -name VERILOG_FILE rtl/ipcore/datamem16.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/instrmem.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/opl3.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/opl3seq.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/opl3_in.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/opl3_mem.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/sndfifo.v
+set_global_assignment -name VERILOG_FILE rtl/ipcore/soundwave.v

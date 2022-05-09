@@ -40,9 +40,9 @@ module emu
 	output [12:0] VIDEO_ARX,
 	output [12:0] VIDEO_ARY,
 
-	output  [5:0] VGA_R,
-	output  [5:0] VGA_G,
-	output  [5:0] VGA_B,
+	output  [7:0] VGA_R,
+	output  [7:0] VGA_G,
+	output  [7:0] VGA_B,
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
@@ -179,11 +179,7 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;  
 
-assign VGA_SL = 0;
 assign VGA_F1 = 0;
-assign VGA_SCALER = 0;
-assign HDMI_FREEZE = 0;
-
 assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
@@ -193,17 +189,16 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-wire [1:0] ar = status[9:8];
-
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+assign VIDEO_ARX = status[5] ? 8'd16 : 8'd4;
+assign VIDEO_ARY = status[5] ? 8'd9  : 8'd3; 
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"MyCore;;",
 	"-;",
-	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O2,TV Mode,NTSC,PAL;",
+	"O5,Aspect ratio,4:3,16:9;",
+	"O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"-;",
 	"O34,CPU Speed,/1,/2,/3,/4;",
 	"-;",
 	"T0,Reset;",
@@ -213,9 +208,11 @@ localparam CONF_STR = {
 
 wire  [1:0] cpu_speed = status[4:3];
 
-wire forced_scandoubler;
+wire [21:0] gamma_bus;
 wire  [1:0] buttons;
 wire [31:0] status;
+wire [ 1:0] mode = status[4:3];
+wire [ 1:0] old_mode;
 
 wire ps2_kbd_clk_out;
 wire ps2_kbd_data_out;
@@ -239,9 +236,9 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
-	.gamma_bus(),
+	.gamma_bus(gamma_bus),
 
-	//.forced_scandoubler(forced_scandoubler),
+	.forced_scandoubler(forced_scandoubler),
 
 	.buttons(buttons),
 	.status(status),
@@ -267,31 +264,31 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
-wire clk_25, clk_70;
-
-/*
-wire clk_sys = clk_25;
-wire clk_sdr = clk_70 * 2;
-wire clk_cpu = clk_70;
-wire clk_dsp = clk_70;
-//assign SDRAM_CLK = clk_70 * 2;
-
-//assign SDRAM_CLK = clk_sys;
-*/
+wire clk_25, clk_50, clk_100;
 
 wire clk_sys = clk_25;
-wire clk_sdr = CLK_50M;
+wire clk_sdr = clk_100;
+wire clk_cpu = clk_50;
+wire clk_dsp = clk_50;
+wire pll_locked;
+
+assign SDRAM_CLK = clk_sdr;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_25),
-	.outclk_1(clk_70)	
+	.outclk_1(clk_50),
+	.outclk_2(clk_100),	
+	.locked (pll_locked)	
 );
 
 reg  reset;
-always @(posedge clk_sys) reset <= status[0] | buttons[1] | !bios_loaded;
+always @(posedge clk_cpu) begin
+	old_mode <= mode;
+	reset <= (!pll_locked | status[0] | buttons[1] | old_mode != mode | RESET| !bios_loaded);
+end
 
 //////////////////////////////////////////////////////////////////
 
@@ -300,17 +297,21 @@ wire HSync;
 wire VBlank;
 wire VSync;
 
+wire [5:0] vga_r;
+wire [5:0] vga_g;
+wire [5:0] vga_b;
+
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sys), 		// SDRAM i
+	.clk_sdr(clk_sdr), 		// SDRAM i
 
-	.CLK44100x256(), 		// Soundwave i
-	.CLK14745600(), 		// RS232 clk i
-	.clk_50(CLK_50M), 				// OPL3 i
-	.clk_OPL(), 			// i
+	.CLK44100x256(clk_sys), 		// Soundwave i
+	.CLK14745600(clk_sys), 		// RS232 clk i
+	.clk_50(clk_50), 				// OPL3 i
+	.clk_OPL(clk_50), 			// i
 
-	.clk_cpu(clk_sys),  	// i
+	.clk_cpu(clk_cpu),  	// i
 	.clk_dsp(clk_sys), 		// i
 	.cpu_speed(cpu_speed), 	// CPU speed control, 0 - maximum [1:0] i
 
@@ -320,9 +321,9 @@ system ddr_186
 	.sdr_DATA(SDRAM_DQ), 	// [15:0] io
 	.sdr_DQM({SDRAM_DQMH, SDRAM_DQML}), // [1:0] o
 
-	.VGA_R(VGA_R), 			// [5:0] o
-	.VGA_G(VGA_G), 			// [5:0] o
-	.VGA_B(VGA_B), 			// [5:0] o
+	.VGA_R(vga_r), 			// [5:0] o
+	.VGA_G(vga_g), 			// [5:0] o
+	.VGA_B(vga_b), 			// [5:0] o
 
 	.frame_on(),			// o
 
@@ -379,7 +380,7 @@ reg        bios_wr = 0;
 wire       bios_req;
 reg        bios_loaded = 0;
 
-always @(posedge clk_sys) begin
+always @(posedge clk_sdr) begin
 	reg [7:0] dat;
 	reg       bios_reqD;
 	reg       ioctl_downlD;
@@ -394,9 +395,9 @@ always @(posedge clk_sys) begin
 
 	if (ioctl_download & ioctl_wr) begin
 		if (ioctl_addr[0]) begin
-			//bios_tmp[ioctl_addr[6:1]] <= {ioctl_dout, dat};			
-			bios_tmp <= {ioctl_dout, dat};
-			//if (&ioctl_addr[5:1]) 
+			bios_tmp[ioctl_addr[6:1]] <= {ioctl_dout, dat};			
+			//bios_tmp <= {ioctl_dout, dat};
+			if (&ioctl_addr[5:1]) 
 				bios_wr <= 1;
 		end else begin
 			dat <= ioctl_dout;
@@ -408,7 +409,7 @@ always @(posedge clk_sys) begin
 
 	if (ioctl_download & bios_req) begin
 		bios_addr <= bios_addr + 1'd1;
-		bios_din <= bios_tmp; //[bios_addr[5:0]];
+		bios_din <= bios_tmp[bios_addr[5:0]];
 	end
 end
 
@@ -475,32 +476,28 @@ rommif #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.mif")) BIOS
 );
 */
 
-/*
-video video
+wire [1:0] scale = status[2:1];
+assign VGA_SL = scale;
+wire freeze_sync;
+
+video_mixer #(640, 1) mixer
 (
-	.clk(),
-	.reset(),
-	
-	.pal(),
-	.scandouble(),
+	.*,
+    .hq2x(scale == 1),
+    .scandoubler (scale || forced_scandoubler),
 
-	.ce_pix(),
+	.ce_pix(1'b1),
 
-	.HBlank(),
-	.HSync(),
-	.VBlank(),
-	.VSync(),
-
-	.video()
+    .R({vga_r[5:0],vga_r[5]}), 
+    .G({vga_g[5:0],vga_g[5]}), 
+    .B({vga_b[5:0],vga_b[5]})
 );
-*/
 
 assign CLK_VIDEO = clk_sys;
-assign CE_PIXEL = 1'b1;
-
-assign VGA_DE = ~(HBlank | VBlank);
-assign VGA_HS = HSync;
-assign VGA_VS = VSync;
+//assign CE_PIXEL = 1'b1;
+//assign VGA_DE = ~(HBlank | VBlank);
+//assign VGA_HS = HSync;
+//assign VGA_VS = VSync;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
