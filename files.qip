@@ -4,6 +4,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mycore.v
 set_global_assignment -name SDC_FILE mycore.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE mycore.sv
 
+set_global_assignment -name VHDL_FILE rtl/sdram.vhd
+set_global_assignment -name SDC_FILE rtl/sdram.sdc
+set_global_assignment -name VHDL_FILE rtl/common.vhd
+
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cache_controller.sv
 set_global_assignment -name VERILOG_FILE rtl/KB_8042.v
 set_global_assignment -name VERILOG_FILE rtl/PIC_8259.v

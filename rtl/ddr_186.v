@@ -135,6 +135,16 @@ module system (
 	inout [15:0]sdr_DATA,
 	output [1:0]sdr_DQM,
 
+	output sdr_n_CS,
+	output sdr_n_WE,
+	output sdr_n_RAS,
+	output sdr_n_CAS,
+	output sdr_CKE,
+	output sdr_DQMH, 
+	output sdr_DQML, 	
+
+	input locked,
+
 	output reg [5:0]VGA_R,
 	output reg [5:0]VGA_G,
 	output reg [5:0]VGA_B,
@@ -357,6 +367,7 @@ module system (
 	reg        BIOS_data_valid;
 	reg  [1:0] auto_flush = 2'b00; // decod81
 
+	/*
 	SDRAM_16bit SDR
 	(
 		.sys_CLK(clk_sdr),                                              // clock
@@ -367,11 +378,40 @@ module system (
 		.sys_rd_data_valid(sys_rd_data_valid),                          // data valid read
 		.sys_wr_data_valid(sys_wr_data_valid),                          // data valid write
 		.sys_cmd_ack(sys_cmd_ack),                                      // command acknowledged
+
 		.sdr_n_CS_WE_RAS_CAS(sdr_n_CS_WE_RAS_CAS),                      // SDRAM #CS, #WE, #RAS, #CAS
 		.sdr_BA(sdr_BA),                                                // SDRAM bank address
 		.sdr_ADDR(sdr_ADDR),                                            // SDRAM address
 		.sdr_DATA(sdr_DATA),                                            // SDRAM data
 		.sdr_DQM(sdr_DQM)                                               // SDRAM DQM
+	);
+	*/
+
+	sdram #(.CLK_FREQ(100.0)) SDR   // 48.0
+	(
+  		.reset(~locked),  			// ok
+  		.clk(clk_sdr), 				// ok
+  		// controller interface
+  		.addr(sdraddr),  			// ok
+  		.data(BIOS_data_valid ? BIOS_data : cntrl0_user_input_data), // ok
+
+  		.we(sys_wr_data_valid),    	// ok
+  		.req(sys_rd_data_valid),    // ok
+  		.ack(sys_cmd_ack),			// ok
+  		//.valid(sdram_valid),		// o
+  		.q(sys_DOUT),	
+		  			// ok
+  		// SDRAM interface
+  		.sdram_a(sdr_ADDR),  		// ok
+  		.sdram_ba(sdr_BA),			// ok
+  		.sdram_dq(sdr_DATA),    	// ok
+  		.sdram_cke(sdr_CKE), 		// ok
+  		.sdram_cs_n(sdr_n_CS),  	// ok
+  		.sdram_ras_n(sdr_n_RAS),  	// ok
+  		.sdram_cas_n(sdr_n_CAS),	// ok
+  		.sdram_we_n(sdr_n_WE),  	// ok
+  		.sdram_dqmh(sdr_DQMH),  	// ok
+  		.sdram_dqml(sdr_DQML)  		// ok
 	);
 
 	fifo vga_fifo 

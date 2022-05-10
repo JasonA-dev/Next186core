@@ -315,11 +315,21 @@ system ddr_186
 	.clk_dsp(clk_sys), 		// i
 	.cpu_speed(cpu_speed), 	// CPU speed control, 0 - maximum [1:0] i
 
-	.sdr_n_CS_WE_RAS_CAS({SDRAM_nCS, SDRAM_nWE, SDRAM_nRAS, SDRAM_nCAS}), // [3:0] o
+	//.sdr_n_CS_WE_RAS_CAS({SDRAM_nCS, SDRAM_nWE, SDRAM_nRAS, SDRAM_nCAS}), // [3:0] o
 	.sdr_BA(SDRAM_BA),  	// [1:0] o
 	.sdr_ADDR(SDRAM_A),  	// [12:0] o
 	.sdr_DATA(SDRAM_DQ), 	// [15:0] io
-	.sdr_DQM({SDRAM_DQMH, SDRAM_DQML}), // [1:0] o
+	//.sdr_DQM({SDRAM_DQMH, SDRAM_DQML}), // [1:0] o
+
+	.sdr_n_CS(SDRAM_nCS),	// o
+	.sdr_n_WE(SDRAM_nWE),	// o
+	.sdr_n_RAS(SDRAM_nRAS),	// o
+	.sdr_n_CAS(SDRAM_nCAS),	// o
+	.sdr_DQMH(SDRAM_DQMH), 	// o
+	.sdr_DQML(SDRAM_DQML), 	// o	
+	.sdr_CKE(SDRAM_CKE),	// o
+
+	.locked(pll_locked),	// i
 
 	.VGA_R(vga_r), 			// [5:0] o
 	.VGA_G(vga_g), 			// [5:0] o
