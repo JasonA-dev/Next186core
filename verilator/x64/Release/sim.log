@@ -27,5 +27,8 @@
   sim_main.cpp
   C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um\dinput.h: DIRECTINPUT_VERSION undefined. Defaulting to version 0x0800
   Generating Code...
-     Creating library C:\NoSync\MiSTer\MyCores\Next186core\verilator\x64\Release\sim.lib and object C:\NoSync\MiSTer\MyCores\Next186core\verilator\x64\Release\sim.exp
-  sim.vcxproj -> C:\NoSync\MiSTer\MyCores\Next186core\verilator\x64\Release\sim.exe
+     Creating library C:\NoSync\MiSTer\My Repos\Next186core\verilator\x64\Release\sim.lib and object C:\NoSync\MiSTer\My Repos\Next186core\verilator\x64\Release\sim.exp
+FileTracker : error FTK1013: could not find unicode byte order marker in the file tracking log file: C:\NoSync\MiSTer\My Repos\Next186core\verilator\x64\Release\sim.tlog\link.read.1.tlog. The tracking data is invalid.
+  
+FileTracker : error FTK1013: could not find unicode byte order marker in the file tracking log file: C:\NoSync\MiSTer\My Repos\Next186core\verilator\x64\Release\sim.tlog\link.write.1.tlog. The tracking data is invalid.
+  

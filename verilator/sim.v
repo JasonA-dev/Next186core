@@ -62,6 +62,89 @@ module top (
 );
 
 
+system ddr_186
+(
+	.clk_25(clk_sys), 		// VGA i
+	.clk_sdr(clk_sys), 		// SDRAM i
+
+	.CLK44100x256(clk_sys), 		// Soundwave i
+	.CLK14745600(clk_sys), 		// RS232 clk i
+	.clk_50(clk_50), 				// OPL3 i
+	.clk_OPL(clk_50), 			// i
+
+	.clk_cpu(clk_cpu),  	// i
+	.clk_dsp(clk_sys), 		// i
+	.cpu_speed(cpu_speed), 	// CPU speed control, 0 - maximum [1:0] i
+
+	//.sdr_n_CS_WE_RAS_CAS({SDRAM_nCS, SDRAM_nWE, SDRAM_nRAS, SDRAM_nCAS}), // [3:0] o
+	.sdr_BA(SDRAM_BA),  	// [1:0] o
+	.sdr_ADDR(SDRAM_A),  	// [12:0] o
+	.sdr_DATA(SDRAM_DQ), 	// [15:0] io
+	//.sdr_DQM({SDRAM_DQMH, SDRAM_DQML}), // [1:0] o
+
+	.sdr_n_CS(SDRAM_nCS),	// o
+	.sdr_n_WE(SDRAM_nWE),	// o
+	.sdr_n_RAS(SDRAM_nRAS),	// o
+	.sdr_n_CAS(SDRAM_nCAS),	// o
+	.sdr_DQMH(SDRAM_DQMH), 	// o
+	.sdr_DQML(SDRAM_DQML), 	// o	
+	.sdr_CKE(SDRAM_CKE),	// o
+
+	.locked(pll_locked),	// i
+
+	.VGA_R(vga_r), 			// [5:0] o
+	.VGA_G(vga_g), 			// [5:0] o
+	.VGA_B(vga_b), 			// [5:0] o
+
+	.frame_on(),			// o
+
+	.VGA_HSYNC(HSync), 		// o
+	.VGA_VSYNC(VSync), 		// o
+
+	.hblnk(HBlank), 		// o
+	.vblnk(VBlank), 		// o
+
+	.BTN_RESET(reset),		// Reset i
+	.BTN_NMI(1'b0),			// NMI i
+
+	.LED(),					// HALT [7:0] o
+
+	.RS232_DCE_RXD(), 		// i
+	.RS232_DCE_TXD(), 		// o
+	.RS232_EXT_RXD(), 		// i
+	.RS232_EXT_TXD(), 		// o
+	.RS232_HOST_RXD(), 		// i
+	.RS232_HOST_TXD(), 		// o
+	.RS232_HOST_RST(), 		// o
+
+	.SD_n_CS(SD_CS), 		// 1'b1, o
+	.SD_DI(SD_MOSI), 		// o
+	.SD_CK(SD_SCK), 		// 0, o
+	.SD_DO(SD_MISO), 		// i
+		 
+	.AUD_L(AUDIO_L), 		// o
+	.AUD_R(AUDIO_R), 		// o
+
+	.PS2_CLK1_I(ps2_kbd_clk_in), 		// i
+	.PS2_CLK1_O(ps2_kbd_clk_out), 		// o
+	.PS2_CLK2_I(ps2_mouse_clk_in), 		// i
+	.PS2_CLK2_O(ps2_mouse_clk_out), 	// o
+	.PS2_DATA1_I(ps2_kbd_data_in), 		// i
+	.PS2_DATA1_O(ps2_kbd_data_out), 	// o
+	.PS2_DATA2_I(ps2_mouse_data_in), 	// i
+	.PS2_DATA2_O(ps2_mouse_data_out), 	// o
+
+	.GPIO(), 				// [7:0] io
+	.I2C_SCL(), 			// o
+	.I2C_SDA(), 			// io
+
+	.BIOS_ADDR(bios_addr), 	// [12:0] i
+	.BIOS_DIN(bios_din), 	// [15:0] i
+	.BIOS_WR(bios_wr), 		// i
+	.BIOS_REQ(bios_req) 	// o
+);
+
+/*
 rom #(.DW(8), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
 (
 	.clock  	(clk_sys	),
@@ -69,5 +152,16 @@ rom #(.DW(8), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
 	.data_out   (bios_tmp_din	),
 	.out_address(bios_tmp_addr  )
 );
+*/
+
+/*
+rom #(.DW(8), .AW(13), .FN("./rtl/BIOS/Next186.hex")) BIOS
+(
+	.clock  	(clk_sys	    ),
+	.ce     	(bios_req	    ),
+    .in_address (bios_load_addr ),
+	.data_out   (bios_tmp_din	)
+);
+*/
 
 endmodule

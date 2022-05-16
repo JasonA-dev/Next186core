@@ -5,4 +5,5 @@ verilator \
 --converge-limit 6000 \
 -Wno-fatal \
 --top-module top sim.v \
-../rtl/rom.v
+../rtl/rom.v \
+../rtl/ddr_186.v

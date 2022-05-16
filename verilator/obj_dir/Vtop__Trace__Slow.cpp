@@ -130,17 +130,6 @@ void Vtop::traceInitSub0(void* userp, VerilatedVcd* tracep) {
         tracep->declBus(c+84,"top ioctl_din", false,-1, 7,0);
         tracep->declBus(c+85,"top ioctl_index", false,-1, 7,0);
         tracep->declBit(c+86,"top ioctl_wait", false,-1);
-        tracep->declBit(c+87,"top clk_sys", false,-1);
-        tracep->declBit(c+88,"top bios_req", false,-1);
-        tracep->declBit(c+89,"top bios_tmp_din", false,-1);
-        tracep->declBit(c+90,"top bios_tmp_addr", false,-1);
-        tracep->declBus(c+95,"top BIOS DW", false,-1, 31,0);
-        tracep->declBus(c+96,"top BIOS AW", false,-1, 31,0);
-        tracep->declArray(c+97,"top BIOS FN", false,-1, 175,0);
-        tracep->declBit(c+91,"top BIOS clock", false,-1);
-        tracep->declBit(c+92,"top BIOS ce", false,-1);
-        tracep->declBus(c+93,"top BIOS data_out", false,-1, 7,0);
-        tracep->declBus(c+94,"top BIOS out_address", false,-1, 12,0);
     }
 }
 
@@ -167,8 +156,6 @@ void Vtop::traceFullSub0(void* userp, VerilatedVcd* tracep) {
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
     vluint32_t* const oldp = tracep->oldp(vlSymsp->__Vm_baseCode);
     if (false && oldp) {}  // Prevent unused
-    // Variables
-    VlWide<6>/*191:0*/ __Vtemp2;
     // Body
     {
         tracep->fullBit(oldp+1,(vlTOPp->clk_28_636));
@@ -257,22 +244,5 @@ void Vtop::traceFullSub0(void* userp, VerilatedVcd* tracep) {
         tracep->fullCData(oldp+84,(vlTOPp->top__DOT__ioctl_din),8);
         tracep->fullCData(oldp+85,(vlTOPp->top__DOT__ioctl_index),8);
         tracep->fullBit(oldp+86,(vlTOPp->top__DOT__ioctl_wait));
-        tracep->fullBit(oldp+87,(vlTOPp->top__DOT__clk_sys));
-        tracep->fullBit(oldp+88,(vlTOPp->top__DOT__bios_req));
-        tracep->fullBit(oldp+89,(vlTOPp->top__DOT__bios_tmp_din));
-        tracep->fullBit(oldp+90,(vlTOPp->top__DOT__bios_tmp_addr));
-        tracep->fullBit(oldp+91,(vlTOPp->top__DOT__BIOS__DOT__clock));
-        tracep->fullBit(oldp+92,(vlTOPp->top__DOT__BIOS__DOT__ce));
-        tracep->fullCData(oldp+93,(vlTOPp->top__DOT__BIOS__DOT__data_out),8);
-        tracep->fullSData(oldp+94,(vlTOPp->top__DOT__BIOS__DOT__out_address),13);
-        tracep->fullIData(oldp+95,(8U),32);
-        tracep->fullIData(oldp+96,(0xdU),32);
-        __Vtemp2[0U] = 0x2e686578U;
-        __Vtemp2[1U] = 0x74313836U;
-        __Vtemp2[2U] = 0x2f4e6578U;
-        __Vtemp2[3U] = 0x42494f53U;
-        __Vtemp2[4U] = 0x72746c2fU;
-        __Vtemp2[5U] = 0x2e2fU;
-        tracep->fullWData(oldp+97,(__Vtemp2),176);
     }
 }

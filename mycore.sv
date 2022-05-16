@@ -287,7 +287,7 @@ pll pll
 reg  reset;
 always @(posedge clk_cpu) begin
 	old_mode <= mode;
-	reset <= (!pll_locked | status[0] | buttons[1] | old_mode != mode | RESET| !bios_loaded);
+	reset <= (!pll_locked | status[0] | buttons[1] | old_mode != mode | RESET);
 end
 
 //////////////////////////////////////////////////////////////////
@@ -304,7 +304,7 @@ wire [5:0] vga_b;
 system ddr_186
 (
 	.clk_25(clk_sys), 		// VGA i
-	.clk_sdr(clk_sdr), 		// SDRAM i
+	.clk_sdr(clk_sys), 		// SDRAM i
 
 	.CLK44100x256(clk_sys), 		// Soundwave i
 	.CLK14745600(clk_sys), 		// RS232 clk i
@@ -377,18 +377,20 @@ system ddr_186
 	.I2C_SCL(), 			// o
 	.I2C_SDA(), 			// io
 
-	.BIOS_ADDR(bios_addr), 	// [12:0] i
-	.BIOS_DIN(bios_din), 	// [15:0] i
-	.BIOS_WR(bios_wr), 		// i
-	.BIOS_REQ(bios_req) 	// o
+	//.BIOS_ADDR(bios_addr), 	// [12:0] i
+	//.BIOS_DIN(bios_din), 	// [15:0] i
+	//.BIOS_WR(bios_wr), 		// i
+	//.BIOS_REQ(bios_req) 	// o
 );
 
+/*
 reg [15:0] bios_tmp;
 reg [12:0] bios_addr = 0;
 reg [15:0] bios_din;
 reg        bios_wr = 0;
 wire       bios_req;
 reg        bios_loaded = 0;
+*/
 
 /*
 always @(posedge clk_sdr) begin
@@ -425,10 +427,13 @@ always @(posedge clk_sdr) begin
 end
 */
 
+/*
 reg [12:0] bios_addr_counter = 0;
 reg [12:0] bios_load_addr;
 reg [7:0]  bios_tmp_din;
+*/
 
+/*
 always @(posedge clk_sys) begin
    	reg [7:0]   dat;
    	reg         dat_set;
@@ -467,6 +472,7 @@ always @(posedge clk_sys) begin
       	end
    	end
 end
+*/
 
 /*
 rom #(.DW(8), .AW(14), .FN("./rtl/BIOS/Next186.hex")) BIOS

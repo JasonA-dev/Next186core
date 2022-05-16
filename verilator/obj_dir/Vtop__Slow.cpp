@@ -9,9 +9,6 @@
 
 //==========
 
-const IData Vtop::var_top__DOT__BIOS__DOT__DW(8U);
-const IData Vtop::var_top__DOT__BIOS__DOT__AW(0xdU);
-
 Vtop::Vtop(VerilatedContext* _vcontextp__, const char* _vcname__)
     : VerilatedModule{_vcname__}
  {
@@ -37,7 +34,7 @@ Vtop::~Vtop() {
 
 // Savable
 void Vtop::__Vserialize(VerilatedSerialize& os) {
-    vluint64_t __Vcheckval = 0xed21fca8c73faae5ULL;
+    vluint64_t __Vcheckval = 0x971b3874eee8103dULL;
     os << __Vcheckval;
     os << __VlSymsp->_vm_contextp__;
     os<<clk_28_636;
@@ -126,27 +123,13 @@ void Vtop::__Vserialize(VerilatedSerialize& os) {
     os<<top__DOT__ioctl_din;
     os<<top__DOT__ioctl_index;
     os<<top__DOT__ioctl_wait;
-    os<<top__DOT____Vcellout__BIOS__out_address;
-    os<<top__DOT____Vcellout__BIOS__data_out;
-    os<<top__DOT__clk_sys;
-    os<<top__DOT__bios_req;
-    os<<top__DOT__bios_tmp_din;
-    os<<top__DOT__bios_tmp_addr;
-    os<<top__DOT__BIOS__DOT__clock;
-    os<<top__DOT__BIOS__DOT__ce;
-    os<<top__DOT__BIOS__DOT__data_out;
-    os<<top__DOT__BIOS__DOT__out_address;
-    for (int __Vi0=0; __Vi0<8192; ++__Vi0) {
-        os<<top__DOT__BIOS__DOT__d[__Vi0];
-    }
-    os<<__Vclklast__TOP__top__DOT__clk_sys;
     for (int __Vi0=0; __Vi0<1; ++__Vi0) {
         os<<__Vm_traceActivity[__Vi0];
     }
     __VlSymsp->__Vserialize(os);
 }
 void Vtop::__Vdeserialize(VerilatedDeserialize& os) {
-    vluint64_t __Vcheckval = 0xed21fca8c73faae5ULL;
+    vluint64_t __Vcheckval = 0x971b3874eee8103dULL;
     os.readAssert(__Vcheckval);
     os >> __VlSymsp->_vm_contextp__;
     os>>clk_28_636;
@@ -235,20 +218,6 @@ void Vtop::__Vdeserialize(VerilatedDeserialize& os) {
     os>>top__DOT__ioctl_din;
     os>>top__DOT__ioctl_index;
     os>>top__DOT__ioctl_wait;
-    os>>top__DOT____Vcellout__BIOS__out_address;
-    os>>top__DOT____Vcellout__BIOS__data_out;
-    os>>top__DOT__clk_sys;
-    os>>top__DOT__bios_req;
-    os>>top__DOT__bios_tmp_din;
-    os>>top__DOT__bios_tmp_addr;
-    os>>top__DOT__BIOS__DOT__clock;
-    os>>top__DOT__BIOS__DOT__ce;
-    os>>top__DOT__BIOS__DOT__data_out;
-    os>>top__DOT__BIOS__DOT__out_address;
-    for (int __Vi0=0; __Vi0<8192; ++__Vi0) {
-        os>>top__DOT__BIOS__DOT__d[__Vi0];
-    }
-    os>>__Vclklast__TOP__top__DOT__clk_sys;
     for (int __Vi0=0; __Vi0<1; ++__Vi0) {
         os>>__Vm_traceActivity[__Vi0];
     }
@@ -277,8 +246,6 @@ void Vtop::_settle__TOP__1(Vtop__Syms* __restrict vlSymsp) {
     vlTOPp->top__DOT__SD_CK = vlTOPp->SD_CK;
     vlTOPp->top__DOT__SD_DO = vlTOPp->SD_DO;
     vlTOPp->top__DOT__ioctl_din = vlTOPp->ioctl_din;
-    vlTOPp->top__DOT__BIOS__DOT__clock = vlTOPp->top__DOT__clk_sys;
-    vlTOPp->top__DOT__BIOS__DOT__ce = vlTOPp->top__DOT__bios_req;
     vlTOPp->top__DOT__clk_28_636 = vlTOPp->clk_28_636;
     vlTOPp->top__DOT__clk_25 = vlTOPp->clk_25;
     vlTOPp->top__DOT__clk_14_318 = vlTOPp->clk_14_318;
@@ -298,17 +265,11 @@ void Vtop::_settle__TOP__1(Vtop__Syms* __restrict vlSymsp) {
     vlTOPp->top__DOT__ioctl_addr = vlTOPp->ioctl_addr;
     vlTOPp->top__DOT__ioctl_dout = vlTOPp->ioctl_dout;
     vlTOPp->top__DOT__ioctl_index = vlTOPp->ioctl_index;
-    vlTOPp->top__DOT__bios_tmp_addr = (1U & (IData)(vlTOPp->top__DOT____Vcellout__BIOS__out_address));
-    vlTOPp->top__DOT__bios_tmp_din = (1U & (IData)(vlTOPp->top__DOT____Vcellout__BIOS__data_out));
-    vlTOPp->top__DOT__BIOS__DOT__data_out = vlTOPp->top__DOT____Vcellout__BIOS__data_out;
-    vlTOPp->top__DOT__BIOS__DOT__out_address = vlTOPp->top__DOT____Vcellout__BIOS__out_address;
 }
 
 void Vtop::_initial__TOP__2(Vtop__Syms* __restrict vlSymsp) {
     VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_initial__TOP__2\n"); );
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
-    // Variables
-    VlWide<6>/*191:0*/ __Vtemp1;
     // Body
     vlTOPp->ioctl_wait = 0U;
     vlTOPp->PS2DATB = 0U;
@@ -316,20 +277,11 @@ void Vtop::_initial__TOP__2(Vtop__Syms* __restrict vlSymsp) {
     vlTOPp->PS2CLKB = 0U;
     vlTOPp->SRAM_D = 0U;
     vlTOPp->PS2CLKA = 0U;
-    __Vtemp1[0U] = 0x2e686578U;
-    __Vtemp1[1U] = 0x74313836U;
-    __Vtemp1[2U] = 0x2f4e6578U;
-    __Vtemp1[3U] = 0x42494f53U;
-    __Vtemp1[4U] = 0x72746c2fU;
-    __Vtemp1[5U] = 0x2e2fU;
-    VL_READMEM_N(true, 8, 8192, 0, VL_CVT_PACK_STR_NW(6, __Vtemp1)
-                 ,  &(vlTOPp->top__DOT__BIOS__DOT__d)
-                 , 0U, ~0ULL);
     vlTOPp->top__DOT__ioctl_wait = vlTOPp->ioctl_wait;
 }
 
-void Vtop::_settle__TOP__5(Vtop__Syms* __restrict vlSymsp) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_settle__TOP__5\n"); );
+void Vtop::_settle__TOP__4(Vtop__Syms* __restrict vlSymsp) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_settle__TOP__4\n"); );
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
     // Body
     vlTOPp->top__DOT__ioctl_wait = vlTOPp->ioctl_wait;
@@ -345,7 +297,6 @@ void Vtop::_eval_initial(Vtop__Syms* __restrict vlSymsp) {
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
     // Body
     vlTOPp->_initial__TOP__2(vlSymsp);
-    vlTOPp->__Vclklast__TOP__top__DOT__clk_sys = vlTOPp->top__DOT__clk_sys;
 }
 
 void Vtop::final() {
@@ -360,7 +311,7 @@ void Vtop::_eval_settle(Vtop__Syms* __restrict vlSymsp) {
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
     // Body
     vlTOPp->_settle__TOP__1(vlSymsp);
-    vlTOPp->_settle__TOP__5(vlSymsp);
+    vlTOPp->_settle__TOP__4(vlSymsp);
 }
 
 void Vtop::_ctor_var_reset(Vtop* self) {
@@ -453,19 +404,6 @@ void Vtop::_ctor_var_reset(Vtop* self) {
     self->top__DOT__ioctl_din = 0;
     self->top__DOT__ioctl_index = 0;
     self->top__DOT__ioctl_wait = 0;
-    self->top__DOT____Vcellout__BIOS__out_address = 0;
-    self->top__DOT____Vcellout__BIOS__data_out = 0;
-    self->top__DOT__clk_sys = 0;
-    self->top__DOT__bios_req = 0;
-    self->top__DOT__bios_tmp_din = 0;
-    self->top__DOT__bios_tmp_addr = 0;
-    self->top__DOT__BIOS__DOT__clock = 0;
-    self->top__DOT__BIOS__DOT__ce = 0;
-    self->top__DOT__BIOS__DOT__data_out = 0;
-    self->top__DOT__BIOS__DOT__out_address = 0;
-    for (int __Vi0=0; __Vi0<8192; ++__Vi0) {
-        self->top__DOT__BIOS__DOT__d[__Vi0] = 0;
-    }
     for (int __Vi0=0; __Vi0<1; ++__Vi0) {
         self->__Vm_traceActivity[__Vi0] = 0;
     }

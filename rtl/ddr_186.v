@@ -184,12 +184,12 @@ module system (
 	 
 	inout [7:0]GPIO,
 	output I2C_SCL,
-	inout I2C_SDA,
+	inout I2C_SDA
 
-	input [12:0] BIOS_ADDR,
-	input [15:0] BIOS_DIN,
-	input BIOS_WR,
-	output BIOS_REQ
+	//input [12:0] BIOS_ADDR,
+	//input [15:0] BIOS_DIN,
+	//input BIOS_WR,
+	//output BIOS_REQ
 );
 
 	localparam BIOS_BASE = 20'h57800;
@@ -367,6 +367,20 @@ module system (
 	reg        BIOS_data_valid;
 	reg  [1:0] auto_flush = 2'b00; // decod81
 
+	reg [12:0] BIOS_ADDR;
+	reg [15:0] BIOS_DIN;
+	reg BIOS_WR;
+	wire BIOS_REQ;
+
+	bios bios
+	(
+	  .clka(clk_sys),
+	  .ena(1'b1),
+	  .wea(bios_req),
+	  .addra(bios_load_addr),
+	  .douta(bios_tmp_din)
+	);
+
 	/*
 	SDRAM_16bit SDR
 	(
@@ -386,8 +400,8 @@ module system (
 		.sdr_DQM(sdr_DQM)                                               // SDRAM DQM
 	);
 	*/
-
-	sdram #(.CLK_FREQ(100.0)) SDR   // 48.0
+	/*
+	sdram #(.CLK_FREQ(50.0)) SDR   // 48.0
 	(
   		.reset(~locked),  			// ok
   		.clk(clk_sdr), 				// ok
@@ -412,6 +426,30 @@ module system (
   		.sdram_we_n(sdr_n_WE),  	// ok
   		.sdram_dqmh(sdr_DQMH),  	// ok
   		.sdram_dqml(sdr_DQML)  		// ok
+	);
+	*/
+
+	dpr #(.DW(8), .AW(17)) SDR
+	(
+		.clock(clk_sdr),
+
+		.ce1(1'b1),
+		.we1(sys_wr_data_valid),  
+		.di1(BIOS_data_valid ? BIOS_data : cntrl0_user_input_data),      
+		.do1(sys_DOUT),
+		.a1(sdraddr),
+
+		.ce2(),
+		.we2(),
+		.di2(),
+		.do2(),
+		.a2()
+
+		//.ce2(1'b1),
+		//.we2(sdr_n_WE),
+		//.di2(sdr_DATA),
+		//.do2(sdr_DATA),
+		//.a2(sdr_ADDR)
 	);
 
 	fifo vga_fifo 

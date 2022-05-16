@@ -72,7 +72,6 @@ VL_MODULE(Vtop) {
 
     // LOCAL SIGNALS
     // Internals; generally not touched by application code
-    CData/*0:0*/ top__DOT__clk_sys;
     CData/*0:0*/ top__DOT__clk_28_636;
     CData/*0:0*/ top__DOT__clk_25;
     CData/*0:0*/ top__DOT__clk_14_318;
@@ -113,36 +112,18 @@ VL_MODULE(Vtop) {
     CData/*7:0*/ top__DOT__ioctl_din;
     CData/*7:0*/ top__DOT__ioctl_index;
     CData/*0:0*/ top__DOT__ioctl_wait;
-    CData/*0:0*/ top__DOT__bios_req;
-    CData/*0:0*/ top__DOT__bios_tmp_din;
-    CData/*0:0*/ top__DOT__bios_tmp_addr;
-    CData/*0:0*/ top__DOT__BIOS__DOT__clock;
-    CData/*0:0*/ top__DOT__BIOS__DOT__ce;
-    CData/*7:0*/ top__DOT__BIOS__DOT__data_out;
     SData/*11:0*/ top__DOT__inputs;
-    SData/*12:0*/ top__DOT__BIOS__DOT__out_address;
     IData/*20:0*/ top__DOT__SRAM_A;
     IData/*24:0*/ top__DOT__ioctl_addr;
-    VlUnpacked<CData/*7:0*/, 8192> top__DOT__BIOS__DOT__d;
 
     // LOCAL VARIABLES
     // Internals; generally not touched by application code
-    CData/*7:0*/ top__DOT____Vcellout__BIOS__data_out;
-    CData/*0:0*/ __Vclklast__TOP__top__DOT__clk_sys;
-    SData/*12:0*/ top__DOT____Vcellout__BIOS__out_address;
     VlUnpacked<CData/*0:0*/, 1> __Vm_traceActivity;
 
     // INTERNAL VARIABLES
     // Internals; generally not touched by application code
     Vtop__Syms* __VlSymsp;  // Symbol table
 
-    // PARAMETERS
-    // Parameters marked /*verilator public*/ for use by application code
-    enum _IDatatop__DOT__BIOS__DOT__DW { top__DOT__BIOS__DOT__DW = 8U};
-    static const IData var_top__DOT__BIOS__DOT__DW;
-    enum _IDatatop__DOT__BIOS__DOT__AW { top__DOT__BIOS__DOT__AW = 0xdU};
-    static const IData var_top__DOT__BIOS__DOT__AW;
-    // enum WData top__DOT__BIOS__DOT__FN  //wide
     // CONSTRUCTORS
   private:
     VL_UNCOPYABLE(Vtop);  ///< Copying not allowed
@@ -180,7 +161,7 @@ VL_MODULE(Vtop) {
     static QData _change_request(Vtop__Syms* __restrict vlSymsp);
     static QData _change_request_1(Vtop__Syms* __restrict vlSymsp);
   public:
-    static void _combo__TOP__4(Vtop__Syms* __restrict vlSymsp);
+    static void _combo__TOP__3(Vtop__Syms* __restrict vlSymsp);
   private:
     static void _ctor_var_reset(Vtop* self) VL_ATTR_COLD;
   public:
@@ -193,9 +174,8 @@ VL_MODULE(Vtop) {
     static void _eval_initial(Vtop__Syms* __restrict vlSymsp) VL_ATTR_COLD;
     static void _eval_settle(Vtop__Syms* __restrict vlSymsp) VL_ATTR_COLD;
     static void _initial__TOP__2(Vtop__Syms* __restrict vlSymsp) VL_ATTR_COLD;
-    static void _sequent__TOP__3(Vtop__Syms* __restrict vlSymsp);
     static void _settle__TOP__1(Vtop__Syms* __restrict vlSymsp) VL_ATTR_COLD;
-    static void _settle__TOP__5(Vtop__Syms* __restrict vlSymsp) VL_ATTR_COLD;
+    static void _settle__TOP__4(Vtop__Syms* __restrict vlSymsp) VL_ATTR_COLD;
   private:
     static void traceChgSub0(void* userp, VerilatedVcd* tracep);
     static void traceChgTop0(void* userp, VerilatedVcd* tracep);

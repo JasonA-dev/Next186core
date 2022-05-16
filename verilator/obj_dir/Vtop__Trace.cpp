@@ -108,14 +108,6 @@ void Vtop::traceChgSub0(void* userp, VerilatedVcd* tracep) {
         tracep->chgCData(oldp+83,(vlTOPp->top__DOT__ioctl_din),8);
         tracep->chgCData(oldp+84,(vlTOPp->top__DOT__ioctl_index),8);
         tracep->chgBit(oldp+85,(vlTOPp->top__DOT__ioctl_wait));
-        tracep->chgBit(oldp+86,(vlTOPp->top__DOT__clk_sys));
-        tracep->chgBit(oldp+87,(vlTOPp->top__DOT__bios_req));
-        tracep->chgBit(oldp+88,(vlTOPp->top__DOT__bios_tmp_din));
-        tracep->chgBit(oldp+89,(vlTOPp->top__DOT__bios_tmp_addr));
-        tracep->chgBit(oldp+90,(vlTOPp->top__DOT__BIOS__DOT__clock));
-        tracep->chgBit(oldp+91,(vlTOPp->top__DOT__BIOS__DOT__ce));
-        tracep->chgCData(oldp+92,(vlTOPp->top__DOT__BIOS__DOT__data_out),8);
-        tracep->chgSData(oldp+93,(vlTOPp->top__DOT__BIOS__DOT__out_address),13);
     }
 }
 

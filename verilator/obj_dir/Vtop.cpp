@@ -72,30 +72,8 @@ void Vtop::_eval_initial_loop(Vtop__Syms* __restrict vlSymsp) {
     } while (VL_UNLIKELY(__Vchange));
 }
 
-VL_INLINE_OPT void Vtop::_sequent__TOP__3(Vtop__Syms* __restrict vlSymsp) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_sequent__TOP__3\n"); );
-    Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
-    // Variables
-    SData/*12:0*/ __Vdly__top__DOT____Vcellout__BIOS__out_address;
-    // Body
-    __Vdly__top__DOT____Vcellout__BIOS__out_address 
-        = vlTOPp->top__DOT____Vcellout__BIOS__out_address;
-    if (vlTOPp->top__DOT__bios_req) {
-        __Vdly__top__DOT____Vcellout__BIOS__out_address 
-            = (0x1fffU & ((IData)(1U) + (IData)(vlTOPp->top__DOT____Vcellout__BIOS__out_address)));
-        vlTOPp->top__DOT____Vcellout__BIOS__data_out 
-            = vlTOPp->top__DOT__BIOS__DOT__d[vlTOPp->top__DOT____Vcellout__BIOS__out_address];
-    }
-    vlTOPp->top__DOT____Vcellout__BIOS__out_address 
-        = __Vdly__top__DOT____Vcellout__BIOS__out_address;
-    vlTOPp->top__DOT__bios_tmp_addr = (1U & (IData)(vlTOPp->top__DOT____Vcellout__BIOS__out_address));
-    vlTOPp->top__DOT__BIOS__DOT__out_address = vlTOPp->top__DOT____Vcellout__BIOS__out_address;
-    vlTOPp->top__DOT__bios_tmp_din = (1U & (IData)(vlTOPp->top__DOT____Vcellout__BIOS__data_out));
-    vlTOPp->top__DOT__BIOS__DOT__data_out = vlTOPp->top__DOT____Vcellout__BIOS__data_out;
-}
-
-VL_INLINE_OPT void Vtop::_combo__TOP__4(Vtop__Syms* __restrict vlSymsp) {
-    VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_combo__TOP__4\n"); );
+VL_INLINE_OPT void Vtop::_combo__TOP__3(Vtop__Syms* __restrict vlSymsp) {
+    VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_combo__TOP__3\n"); );
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
     // Body
     vlTOPp->top__DOT__clk_28_636 = vlTOPp->clk_28_636;
@@ -128,12 +106,7 @@ void Vtop::_eval(Vtop__Syms* __restrict vlSymsp) {
     VL_DEBUG_IF(VL_DBG_MSGF("+    Vtop::_eval\n"); );
     Vtop* const __restrict vlTOPp VL_ATTR_UNUSED = vlSymsp->TOPp;
     // Body
-    if (((IData)(vlTOPp->top__DOT__clk_sys) & (~ (IData)(vlTOPp->__Vclklast__TOP__top__DOT__clk_sys)))) {
-        vlTOPp->_sequent__TOP__3(vlSymsp);
-    }
-    vlTOPp->_combo__TOP__4(vlSymsp);
-    // Final
-    vlTOPp->__Vclklast__TOP__top__DOT__clk_sys = vlTOPp->top__DOT__clk_sys;
+    vlTOPp->_combo__TOP__3(vlSymsp);
 }
 
 VL_INLINE_OPT QData Vtop::_change_request(Vtop__Syms* __restrict vlSymsp) {
